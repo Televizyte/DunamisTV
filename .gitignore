@@ -1,0 +1,106 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+android/key.properties
+android/keystore/*.jks
+
+# =========================================================
+# DXM repository hygiene and security exclusions
+# =========================================================
+
+# Android signing material
+/android/key.properties
+/android/keystore/
+*.jks
+*.keystore
+*.pem
+*.p12
+*.pfx
+
+# Local Flutter/Android configuration
+/android/local.properties
+/android/local.properties.*
+/android/.gradle/
+
+# DXM historical patch and inspection material
+/.dxm_backups/
+/.patch_backups/
+/inspections/
+*_inspection/
+*_inspections/
+*.tar
+*.tar.gz
+*.zip
+
+# Temporary source snapshots and diagnostic extracts
+*_current.txt
+*_full_current.txt
+*_latest.txt
+*_file_map.txt
+
+# Platform/build residue
+/build/
+/.dart_tool/
+/.flutter-plugins
+/.flutter-plugins-dependencies
+
+# DXM historical source copies
+*.bak
+*.bak_*
+*.before_*
+*.save
+
+# Old release-alignment snapshots
+pubspec.yaml.before_*
+android/local.properties.before_*
+
+# Accidental backend source copied into Flutter repository
+/app/
+/routes/
+
+# Local project snapshots and loose archives
+*.tar.gz
+*.tar
+*.zip

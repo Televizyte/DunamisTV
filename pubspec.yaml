@@ -1,0 +1,52 @@
+name: dunamis_tv
+description: Dunamis TV (Play Store update scaffold, AdMob-compliant)
+publish_to: "none"
+version: 3.47.0+14
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.6
+  go_router: ^14.2.0
+  google_mobile_ads: ^5.2.0
+  webview_flutter: ^4.8.0
+  youtube_player_flutter: ^9.0.3
+  better_player: ^0.0.84
+  video_player: ^2.9.2
+  shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.2.4
+  share_plus: ^10.0.2
+  http: ^1.2.2
+  path_provider: ^2.1.4
+  uuid: ^4.5.1
+  image_picker: ^1.1.2
+  google_fonts: ^6.2.1
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
+  wakelock_plus: ^1.1.4
+  flutter_tts: ^4.2.3
+  audioplayers: ^6.1.0
+  url_launcher: ^6.3.1
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/branding/
+    - assets/icons/social/
+    - assets/branding/splash/dunamis_splash_1080x1920.webp
+    - assets/bible/
+    - assets/bible/books/
+    - assets/audio/dominion_match/
+    - assets/audio/quiz_engine/
+    - assets/audio/race_of_faith/

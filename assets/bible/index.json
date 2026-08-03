@@ -1,0 +1,401 @@
+{
+  "translation": "KJV",
+  "books": [
+    {
+      "name": "Genesis",
+      "abbreviation": "Gen",
+      "testament": "old",
+      "file": "genesis.json"
+    },
+    {
+      "name": "Exodus",
+      "abbreviation": "Exo",
+      "testament": "old",
+      "file": "exodus.json"
+    },
+    {
+      "name": "Leviticus",
+      "abbreviation": "Lev",
+      "testament": "old",
+      "file": "leviticus.json"
+    },
+    {
+      "name": "Numbers",
+      "abbreviation": "Num",
+      "testament": "old",
+      "file": "numbers.json"
+    },
+    {
+      "name": "Deuteronomy",
+      "abbreviation": "Deut",
+      "testament": "old",
+      "file": "deuteronomy.json"
+    },
+    {
+      "name": "Joshua",
+      "abbreviation": "Josh",
+      "testament": "old",
+      "file": "joshua.json"
+    },
+    {
+      "name": "Judges",
+      "abbreviation": "Judg",
+      "testament": "old",
+      "file": "judges.json"
+    },
+    {
+      "name": "Ruth",
+      "abbreviation": "Ruth",
+      "testament": "old",
+      "file": "ruth.json"
+    },
+    {
+      "name": "1 Samuel",
+      "abbreviation": "1Sam",
+      "testament": "old",
+      "file": "1_samuel.json"
+    },
+    {
+      "name": "2 Samuel",
+      "abbreviation": "2Sam",
+      "testament": "old",
+      "file": "2_samuel.json"
+    },
+    {
+      "name": "1 Kings",
+      "abbreviation": "1Kgs",
+      "testament": "old",
+      "file": "1_kings.json"
+    },
+    {
+      "name": "2 Kings",
+      "abbreviation": "2Kgs",
+      "testament": "old",
+      "file": "2_kings.json"
+    },
+    {
+      "name": "1 Chronicles",
+      "abbreviation": "1Chr",
+      "testament": "old",
+      "file": "1_chronicles.json"
+    },
+    {
+      "name": "2 Chronicles",
+      "abbreviation": "2Chr",
+      "testament": "old",
+      "file": "2_chronicles.json"
+    },
+    {
+      "name": "Ezra",
+      "abbreviation": "Ezra",
+      "testament": "old",
+      "file": "ezra.json"
+    },
+    {
+      "name": "Nehemiah",
+      "abbreviation": "Neh",
+      "testament": "old",
+      "file": "nehemiah.json"
+    },
+    {
+      "name": "Esther",
+      "abbreviation": "Est",
+      "testament": "old",
+      "file": "esther.json"
+    },
+    {
+      "name": "Job",
+      "abbreviation": "Job",
+      "testament": "old",
+      "file": "job.json"
+    },
+    {
+      "name": "Psalms",
+      "abbreviation": "Ps",
+      "testament": "old",
+      "file": "psalms.json"
+    },
+    {
+      "name": "Proverbs",
+      "abbreviation": "Prov",
+      "testament": "old",
+      "file": "proverbs.json"
+    },
+    {
+      "name": "Ecclesiastes",
+      "abbreviation": "Eccl",
+      "testament": "old",
+      "file": "ecclesiastes.json"
+    },
+    {
+      "name": "Song of Solomon",
+      "abbreviation": "Song",
+      "testament": "old",
+      "file": "song_of_solomon.json"
+    },
+    {
+      "name": "Isaiah",
+      "abbreviation": "Isa",
+      "testament": "old",
+      "file": "isaiah.json"
+    },
+    {
+      "name": "Jeremiah",
+      "abbreviation": "Jer",
+      "testament": "old",
+      "file": "jeremiah.json"
+    },
+    {
+      "name": "Lamentations",
+      "abbreviation": "Lam",
+      "testament": "old",
+      "file": "lamentations.json"
+    },
+    {
+      "name": "Ezekiel",
+      "abbreviation": "Ezek",
+      "testament": "old",
+      "file": "ezekiel.json"
+    },
+    {
+      "name": "Daniel",
+      "abbreviation": "Dan",
+      "testament": "old",
+      "file": "daniel.json"
+    },
+    {
+      "name": "Hosea",
+      "abbreviation": "Hos",
+      "testament": "old",
+      "file": "hosea.json"
+    },
+    {
+      "name": "Joel",
+      "abbreviation": "Joel",
+      "testament": "old",
+      "file": "joel.json"
+    },
+    {
+      "name": "Amos",
+      "abbreviation": "Amos",
+      "testament": "old",
+      "file": "amos.json"
+    },
+    {
+      "name": "Obadiah",
+      "abbreviation": "Obad",
+      "testament": "old",
+      "file": "obadiah.json"
+    },
+    {
+      "name": "Jonah",
+      "abbreviation": "Jon",
+      "testament": "old",
+      "file": "jonah.json"
+    },
+    {
+      "name": "Micah",
+      "abbreviation": "Mic",
+      "testament": "old",
+      "file": "micah.json"
+    },
+    {
+      "name": "Nahum",
+      "abbreviation": "Nah",
+      "testament": "old",
+      "file": "nahum.json"
+    },
+    {
+      "name": "Habakkuk",
+      "abbreviation": "Hab",
+      "testament": "old",
+      "file": "habakkuk.json"
+    },
+    {
+      "name": "Zephaniah",
+      "abbreviation": "Zeph",
+      "testament": "old",
+      "file": "zephaniah.json"
+    },
+    {
+      "name": "Haggai",
+      "abbreviation": "Hag",
+      "testament": "old",
+      "file": "haggai.json"
+    },
+    {
+      "name": "Zechariah",
+      "abbreviation": "Zech",
+      "testament": "old",
+      "file": "zechariah.json"
+    },
+    {
+      "name": "Malachi",
+      "abbreviation": "Mal",
+      "testament": "old",
+      "file": "malachi.json"
+    },
+    {
+      "name": "Matthew",
+      "abbreviation": "Matt",
+      "testament": "new",
+      "file": "matthew.json"
+    },
+    {
+      "name": "Mark",
+      "abbreviation": "Mark",
+      "testament": "new",
+      "file": "mark.json"
+    },
+    {
+      "name": "Luke",
+      "abbreviation": "Luke",
+      "testament": "new",
+      "file": "luke.json"
+    },
+    {
+      "name": "John",
+      "abbreviation": "Jn",
+      "testament": "new",
+      "file": "john.json"
+    },
+    {
+      "name": "Acts",
+      "abbreviation": "Acts",
+      "testament": "new",
+      "file": "acts.json"
+    },
+    {
+      "name": "Romans",
+      "abbreviation": "Rom",
+      "testament": "new",
+      "file": "romans.json"
+    },
+    {
+      "name": "1 Corinthians",
+      "abbreviation": "1Cor",
+      "testament": "new",
+      "file": "1_corinthians.json"
+    },
+    {
+      "name": "2 Corinthians",
+      "abbreviation": "2Cor",
+      "testament": "new",
+      "file": "2_corinthians.json"
+    },
+    {
+      "name": "Galatians",
+      "abbreviation": "Gal",
+      "testament": "new",
+      "file": "galatians.json"
+    },
+    {
+      "name": "Ephesians",
+      "abbreviation": "Eph",
+      "testament": "new",
+      "file": "ephesians.json"
+    },
+    {
+      "name": "Philippians",
+      "abbreviation": "Phil",
+      "testament": "new",
+      "file": "philippians.json"
+    },
+    {
+      "name": "Colossians",
+      "abbreviation": "Col",
+      "testament": "new",
+      "file": "colossians.json"
+    },
+    {
+      "name": "1 Thessalonians",
+      "abbreviation": "1Thess",
+      "testament": "new",
+      "file": "1_thessalonians.json"
+    },
+    {
+      "name": "2 Thessalonians",
+      "abbreviation": "2Thess",
+      "testament": "new",
+      "file": "2_thessalonians.json"
+    },
+    {
+      "name": "1 Timothy",
+      "abbreviation": "1Tim",
+      "testament": "new",
+      "file": "1_timothy.json"
+    },
+    {
+      "name": "2 Timothy",
+      "abbreviation": "2Tim",
+      "testament": "new",
+      "file": "2_timothy.json"
+    },
+    {
+      "name": "Titus",
+      "abbreviation": "Titus",
+      "testament": "new",
+      "file": "titus.json"
+    },
+    {
+      "name": "Philemon",
+      "abbreviation": "Phlm",
+      "testament": "new",
+      "file": "philemon.json"
+    },
+    {
+      "name": "Hebrews",
+      "abbreviation": "Heb",
+      "testament": "new",
+      "file": "hebrews.json"
+    },
+    {
+      "name": "James",
+      "abbreviation": "Jas",
+      "testament": "new",
+      "file": "james.json"
+    },
+    {
+      "name": "1 Peter",
+      "abbreviation": "1Pet",
+      "testament": "new",
+      "file": "1_peter.json"
+    },
+    {
+      "name": "2 Peter",
+      "abbreviation": "2Pet",
+      "testament": "new",
+      "file": "2_peter.json"
+    },
+    {
+      "name": "1 John",
+      "abbreviation": "1Jn",
+      "testament": "new",
+      "file": "1_john.json"
+    },
+    {
+      "name": "2 John",
+      "abbreviation": "2Jn",
+      "testament": "new",
+      "file": "2_john.json"
+    },
+    {
+      "name": "3 John",
+      "abbreviation": "3Jn",
+      "testament": "new",
+      "file": "3_john.json"
+    },
+    {
+      "name": "Jude",
+      "abbreviation": "Jude",
+      "testament": "new",
+      "file": "jude.json"
+    },
+    {
+      "name": "Revelation",
+      "abbreviation": "Rev",
+      "testament": "new",
+      "file": "revelation.json"
+    }
+  ]
+}
