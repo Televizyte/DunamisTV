@@ -21,6 +21,13 @@ class MotivationHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: AdsService.instance.policyRevision,
+      builder: (context, _, __) => _buildForPolicy(context),
+    );
+  }
+
+  Widget _buildForPolicy(BuildContext context) {
     final store = HubScope.maybeOf(context);
     final Map<String, dynamic> hubMap = store?.raw ?? const <String, dynamic>{};
 

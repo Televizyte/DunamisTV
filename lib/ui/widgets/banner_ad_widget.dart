@@ -8,11 +8,13 @@ import '../../services/ads_service.dart';
 class BannerAdWidget extends StatefulWidget {
   final String tabKey;
   final EdgeInsetsGeometry padding;
+  final String placement;
 
   const BannerAdWidget({
     super.key,
     required this.tabKey,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    this.placement = 'page_bottom',
   });
 
   @override
@@ -34,6 +36,23 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   int _requestGeneration = 0;
   Timer? _retryTimer;
 
+  @override
+  void initState() {
+    super.initState();
+    AdsService.instance.policyRevision.addListener(_handlePolicyRevision);
+  }
+
+  void _handlePolicyRevision() {
+    if (!mounted || _disposed) return;
+    if (!_allowed) {
+      _disposeAd();
+    } else if (_lastUnitId != null &&
+        _lastUnitId != AdsService.instance.bannerUnitId.trim()) {
+      _disposeAd();
+    }
+    setState(() {});
+  }
+
   void _scheduleRetry([Duration delay = const Duration(seconds: 3)]) {
     if (_disposed || !_allowed) return;
     _retryTimer?.cancel();
@@ -51,7 +70,10 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
   bool get _allowed {
     try {
-      return AdsService.instance.bannerAllowedForTab(widget.tabKey);
+      return AdsService.instance.bannerAllowedForPlacement(
+        widget.tabKey,
+        widget.placement,
+      );
     } catch (_) {
       return false;
     }
@@ -250,6 +272,10 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
       _lastUnitId = null;
       _scheduleRetry(const Duration(milliseconds: 300));
     }
+    if (oldWidget.placement != widget.placement) {
+      _disposeAd();
+      _scheduleRetry(const Duration(milliseconds: 300));
+    }
   }
 
   void _disposeAd() {
@@ -275,6 +301,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   @override
   void dispose() {
     _disposed = true;
+    AdsService.instance.policyRevision.removeListener(_handlePolicyRevision);
     _disposeAd();
     super.dispose();
   }
@@ -308,14 +335,20 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
         final ad = _ad;
         final size = _resolvedSize;
 
-        if (_loadFailed && ad == null) {
+        final ads = AdsService.instance;
+        final hideOnFailure = ads.bannerHideOnFailureForPolicy(widget.tabKey);
+        final reserveBeforeLoad =
+            ads.bannerReserveSpaceBeforeLoadForPolicy(widget.tabKey);
+
+        if (_loadFailed && ad == null && hideOnFailure) {
           return const SizedBox.shrink();
         }
 
         if (ad == null || size == null || !_isLoaded) {
-          // Mobile should never show a synthetic/fallback ad placeholder.
-          // Reserve no space until a real banner has loaded.
-          return const SizedBox.shrink();
+          if (!reserveBeforeLoad) {
+            return const SizedBox.shrink();
+          }
+          return const SizedBox(width: double.infinity, height: 66);
         }
 
         final resolvedPadding =

@@ -50,7 +50,25 @@ class _NativeInlineAdTileState extends State<NativeInlineAdTile>
   @override
   void initState() {
     super.initState();
+    AdsService.instance.policyRevision.addListener(_handlePolicyRevision);
     _loadNativeAdIfAllowed();
+  }
+
+  void _handlePolicyRevision() {
+    if (!mounted) return;
+    final ads = AdsService.instance;
+    final allowed = ads.nativeAllowedForTab(widget.tabKey) &&
+        ads.hasUnitForFormat('native');
+    if (!allowed) {
+      _disposeAd();
+      _loaded = false;
+      _failed = false;
+      _loading = false;
+    } else if (!_loaded && !_loading) {
+      _failed = false;
+      _loadNativeAdIfAllowed();
+    }
+    setState(() {});
   }
 
   @override
@@ -71,7 +89,8 @@ class _NativeInlineAdTileState extends State<NativeInlineAdTile>
 
     final ads = AdsService.instance;
     if (!ads.nativeRuntimeAvailable ||
-        !ads.nativeAllowedForTab(widget.tabKey)) {
+        !ads.nativeAllowedForTab(widget.tabKey) ||
+        !ads.hasUnitForFormat('native')) {
       _failed = true;
       return;
     }
@@ -189,6 +208,7 @@ class _NativeInlineAdTileState extends State<NativeInlineAdTile>
 
   @override
   void dispose() {
+    AdsService.instance.policyRevision.removeListener(_handlePolicyRevision);
     _disposeAd();
     super.dispose();
   }

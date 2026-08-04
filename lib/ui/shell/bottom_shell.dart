@@ -41,6 +41,22 @@ class BottomShell extends StatefulWidget {
 }
 
 class _BottomShellState extends State<BottomShell> {
+  @override
+  void initState() {
+    super.initState();
+    AdsService.instance.policyRevision.addListener(_handlePolicyRevision);
+  }
+
+  void _handlePolicyRevision() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AdsService.instance.policyRevision.removeListener(_handlePolicyRevision);
+    super.dispose();
+  }
+
   List<HubDynamicTab> _tabs(BuildContext context) {
     final hub = HubScope.of(context);
     final resolved = HubTabRegistry.resolveTabs(hub)
@@ -95,6 +111,13 @@ class _BottomShellState extends State<BottomShell> {
     return key.isNotEmpty ? key : 'home';
   }
 
+  String _policyKeyForLocation(String location, String tabKey) {
+    return AdsService.instance.resolveRoutePolicyKey(
+      location,
+      fallback: tabKey,
+    );
+  }
+
   void _goToIndex(BuildContext context, List<HubDynamicTab> tabs, int index) {
     if (index < 0 || index >= tabs.length) return;
 
@@ -136,11 +159,18 @@ class _BottomShellState extends State<BottomShell> {
     final loc = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(loc, tabs);
     final tabKey = _tabKeyFromIndex(tabs, currentIndex);
+    final policyKey = _policyKeyForLocation(loc, tabKey);
 
-    final bannerAllowed = AdsService.instance.bannerAllowedForTab(tabKey);
+    final bannerAllowed = AdsService.instance.bannerAllowedForPlacement(
+      policyKey,
+      'shell_bottom',
+    );
 
     const navH = kBottomNavigationBarHeight;
-    final bannerH = bannerAllowed ? 66.0 : 0.0;
+    final bannerH = bannerAllowed &&
+            AdsService.instance.bannerReserveSpaceBeforeLoadForPolicy(policyKey)
+        ? 66.0
+        : 0.0;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     final reserved = navH + bannerH + safeBottom;
 
@@ -159,10 +189,12 @@ class _BottomShellState extends State<BottomShell> {
               currentIndex: currentIndex,
               onTap: (i) => _goToIndex(context, tabs, i),
             ),
-            BannerAdWidget(
-              tabKey: tabKey,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-            ),
+            if (bannerAllowed)
+              BannerAdWidget(
+                tabKey: policyKey,
+                placement: 'shell_bottom',
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              ),
           ],
         ),
       ),

@@ -140,38 +140,7 @@ class HubRendererRegistry {
     required List<HubDynamicSection> sections,
     int interval = 4,
   }) {
-    if (sections.isEmpty) {
-      return [];
-    }
-
-    final output = <HubDynamicSection>[];
-
-    for (var i = 0; i < sections.length; i++) {
-      output.add(sections[i]);
-
-      final shouldInsert = i != 0 && (i + 1) % interval == 0;
-
-      if (shouldInsert) {
-        output.add(
-          HubDynamicSection(
-            key: 'dynamic_ad_$i',
-            title: '',
-            subtitle: '',
-            layout: HubDynamicSectionLayout.adBlock,
-            columns: 1,
-            rows: 1,
-            enabled: true,
-            items: const [],
-            settings: const {
-              'source': 'renderer_registry',
-              'placement': 'feed',
-            },
-          ),
-        );
-      }
-    }
-
-    return output;
+    return sections;
   }
 
   static List<HubDynamicSection> normalizeForHomeFeed(
@@ -181,10 +150,7 @@ class HubRendererRegistry {
     final filtered = homeSections(normalized);
     final cleaned = removeEmpty(filtered);
 
-    return injectAdBlocks(
-      sections: cleaned,
-      interval: 4,
-    );
+    return cleaned;
   }
 
   static List<HubDynamicSection> normalizeForExploreFeed(

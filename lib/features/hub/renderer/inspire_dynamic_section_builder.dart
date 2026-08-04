@@ -50,37 +50,7 @@ ${section.type}
     required List<HubDynamicSection> sections,
     int interval = 4,
   }) {
-    if (sections.isEmpty) {
-      return [];
-    }
-
-    final output = <HubDynamicSection>[];
-
-    for (var i = 0; i < sections.length; i++) {
-      output.add(sections[i]);
-
-      final shouldInsert = i != 0 && (i + 1) % interval == 0;
-
-      if (shouldInsert) {
-        output.add(
-          HubDynamicSection(
-            key: 'inspire_dynamic_ad_$i',
-            title: '',
-            subtitle: '',
-            layout: HubDynamicSectionLayout.adBlock,
-            columns: 1,
-            rows: 1,
-            enabled: true,
-            items: const [],
-            settings: const {
-              'placement': 'inspire_feed',
-            },
-          ),
-        );
-      }
-    }
-
-    return output;
+    return sections;
   }
 
   static List<HubDynamicSection> normalizeInspireFeed({
@@ -90,9 +60,6 @@ ${section.type}
       backendSections: backendSections,
     );
 
-    return injectDynamicAds(
-      sections: sections,
-      interval: 4,
-    );
+    return sections;
   }
 }

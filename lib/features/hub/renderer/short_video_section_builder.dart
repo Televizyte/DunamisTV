@@ -22,10 +22,10 @@ ${section.layout.name}
 
       final isShortSection =
           section.layout == HubDynamicSectionLayout.shortVideoFeed ||
-          lower.contains('short') ||
-          lower.contains('shorts') ||
-          lower.contains('reel') ||
-          lower.contains('vertical_video');
+              lower.contains('short') ||
+              lower.contains('shorts') ||
+              lower.contains('reel') ||
+              lower.contains('vertical_video');
 
       if (!isShortSection) continue;
 
@@ -65,36 +65,7 @@ ${section.layout.name}
     required List<HubDynamicSection> sections,
     int interval = 5,
   }) {
-    if (sections.isEmpty) return [];
-
-    final output = <HubDynamicSection>[];
-
-    for (var i = 0; i < sections.length; i++) {
-      output.add(sections[i]);
-
-      final shouldInsert = i != 0 && (i + 1) % interval == 0;
-
-      if (shouldInsert) {
-        output.add(
-          HubDynamicSection(
-            key: 'short_video_dynamic_ad_$i',
-            title: '',
-            subtitle: '',
-            layout: HubDynamicSectionLayout.adBlock,
-            columns: 1,
-            rows: 1,
-            enabled: true,
-            items: const [],
-            settings: const {
-              'placement': 'short_video_feed',
-              'source': 'short_video_section_builder',
-            },
-          ),
-        );
-      }
-    }
-
-    return output;
+    return sections;
   }
 
   static List<HubDynamicSection> normalizeShortVideoFeed({
@@ -104,9 +75,6 @@ ${section.layout.name}
       backendSections: backendSections,
     );
 
-    return injectAdBlocks(
-      sections: sections,
-      interval: 5,
-    );
+    return sections;
   }
 }

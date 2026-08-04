@@ -18,8 +18,7 @@ ${section.key}
 '''
           .toLowerCase();
 
-      final isWatchSection =
-          lower.contains('watch') ||
+      final isWatchSection = lower.contains('watch') ||
           lower.contains('live') ||
           lower.contains('stream') ||
           lower.contains('video') ||
@@ -40,39 +39,7 @@ ${section.key}
     required List<HubDynamicSection> sections,
     int interval = 3,
   }) {
-    if (sections.isEmpty) {
-      return [];
-    }
-
-    final output = <HubDynamicSection>[];
-
-    for (var i = 0; i < sections.length; i++) {
-      output.add(sections[i]);
-
-      final shouldInsert =
-          i != 0 &&
-          (i + 1) % interval == 0;
-
-      if (shouldInsert) {
-        output.add(
-          HubDynamicSection(
-            key: 'watch_dynamic_ad_$i',
-            title: '',
-            subtitle: '',
-            layout: HubDynamicSectionLayout.adBlock,
-            columns: 1,
-            rows: 1,
-            enabled: true,
-            items: const [],
-            settings: const {
-              'placement': 'watch_feed',
-            },
-          ),
-        );
-      }
-    }
-
-    return output;
+    return sections;
   }
 
   static List<HubDynamicSection> normalizeWatchFeed({

@@ -14,13 +14,6 @@ class AdsService {
   /// without making AdsService itself a ChangeNotifier.
   final ValueNotifier<int> policyRevision = ValueNotifier<int>(0);
 
-  static const String fallbackBannerUnitId =
-      'ca-app-pub-4171224553175356/1750219844';
-  static const String fallbackInterstitialUnitId =
-      'ca-app-pub-4171224553175356/7855762495';
-  static const String fallbackNativeUnitId =
-      'ca-app-pub-4171224553175356/9731854705';
-
   // Official Google Android demo units. These are selected automatically in
   // Flutter debug builds, so development never requests live production ads.
   static const String debugBannerUnitId =
@@ -62,8 +55,11 @@ class AdsService {
 
   int _safeActionCount = 0;
   int _interstitialShowsThisSession = 0;
+  int _interstitialRequestGeneration = 0;
   DateTime _sessionStartedAt = DateTime.now();
   String? _loadedInterstitialPolicyKey;
+  String? _activeInterstitialPolicyKey;
+  DateTime? _activeInterstitialPolicyEnteredAt;
 
   Duration interstitialCooldown = const Duration(seconds: 60);
   int interstitialEverySafeActions = 4;
@@ -142,9 +138,13 @@ class AdsService {
 
   void applyBootstrap(Map<String, dynamic> bootstrap) {
     final ads = bootstrap['ads'];
-    if (ads is! Map) return;
+    if (!_isValidAdsContract(ads)) {
+      clearBootstrap();
+      return;
+    }
 
-    _ads = ads.cast<String, dynamic>();
+    dispose();
+    _ads = Map<String, dynamic>.from(ads as Map);
 
     final tabs = _ads['tabs'];
     _tabs = tabs is Map ? tabs.cast<String, dynamic>() : <String, dynamic>{};
@@ -164,6 +164,8 @@ class AdsService {
         : <String, dynamic>{};
 
     _applyGlobalInterstitialConfig();
+    _activeInterstitialPolicyKey = null;
+    _activeInterstitialPolicyEnteredAt = null;
 
     // Notify policy-dependent layouts after all effective settings have been
     // applied. Incrementing avoids suppressing repeated bootstrap refreshes.
@@ -291,34 +293,225 @@ class AdsService {
     return value is Map ? value.cast<String, dynamic>() : <String, dynamic>{};
   }
 
+  dynamic _policyConfigValue(
+    String policyKey,
+    String configKey,
+    String valueKey,
+  ) {
+    var key = _canonicalPolicyKey(policyKey);
+    while (key.isNotEmpty) {
+      final policy = _tabs[key];
+      if (policy is Map) {
+        final config = policy[configKey];
+        if (config is Map && config.containsKey(valueKey)) {
+          return config[valueKey];
+        }
+      }
+      if (!key.contains('.')) break;
+      key = key.substring(0, key.lastIndexOf('.'));
+    }
+    return null;
+  }
+
+  Map<String, dynamic> bannerConfigForPolicy(String policyKey) {
+    return _policyConfig(policyKey, 'banner_config');
+  }
+
+  String bannerPlacementForPolicy(String policyKey) {
+    return (bannerConfigForPolicy(policyKey)['placement'] ?? 'disabled')
+        .toString()
+        .trim()
+        .toLowerCase();
+  }
+
+  bool bannerHideOnFailureForPolicy(String policyKey) {
+    return _boolFromDynamic(
+      bannerConfigForPolicy(policyKey)['hide_on_failure'],
+      fallback: true,
+    );
+  }
+
+  bool bannerReserveSpaceBeforeLoadForPolicy(String policyKey) {
+    return _boolFromDynamic(
+      bannerConfigForPolicy(policyKey)['reserve_space_before_load'],
+      fallback: false,
+    );
+  }
+
+  bool bannerAllowedForPlacement(String policyKey, String placement) {
+    if (!bannerAllowedForTab(policyKey)) return false;
+    if (!hasUnitForFormat('banner')) return false;
+    return bannerPlacementForPolicy(policyKey) ==
+        placement.trim().toLowerCase();
+  }
+
+  String resolveRoutePolicyKey(String location, {required String fallback}) {
+    final uri = Uri.tryParse(location);
+    final path = (uri?.path ?? location).trim().toLowerCase();
+    final candidates = <String>[];
+
+    void add(String key) {
+      final canonical = _canonicalPolicyKey(key);
+      if (canonical.isNotEmpty && !candidates.contains(canonical)) {
+        candidates.add(canonical);
+      }
+    }
+
+    if (path == '/account') add('more.account');
+    if (path == '/saved') add('more.saved');
+    if (path == '/downloads') add('more.downloads');
+    if (path == '/notifications') add('more.notifications');
+    if (path == '/notifications/message') add('more.notifications.message');
+    if (path == '/more/technical-support') add('more.support');
+    if (path == '/watch/channels') add('watch.channels');
+    if (path == '/watch/videos') add('watch.video_list');
+    if (path == '/live') add('watch.player.live');
+    if (path == '/player/hls') add('watch.player.hls');
+    if (path == '/player/youtube' || path == '/player/youtube-legacy') {
+      add('watch.player.youtube');
+    }
+    if (path == '/watch/web') add('watch.player.web_embed');
+    if (path == '/web') add('webview.active');
+    if (path == '/sod') add('inspire.sod.watch');
+    if (path == '/tools/books/chapter') add('explore.books.reader');
+    if (path.startsWith('/games/race-of-faith')) {
+      add('game.race_of_faith.active');
+    }
+    if (path.startsWith('/games/dominion-match')) {
+      add('game.dominion_match.active');
+    }
+    if (path.startsWith('/games/kingdom-builder')) {
+      add('game.kingdom_builder.active');
+    }
+    if (path.startsWith('/quiz/') || path == '/games/bible-quiz') {
+      add('quiz.active');
+    }
+    if (path == '/short-videos') add('explore.shorts.player');
+    if (path == '/tools/notes/editor' || path == '/tools/quote') {
+      add('form.active');
+    }
+
+    final segments = path.split('/').where((part) => part.isNotEmpty).toList();
+    if (segments.isNotEmpty) add(segments.join('.'));
+    add(fallback);
+    return resolveConfiguredPolicyKey(candidates, fallback: fallback);
+  }
+
   int nativeEveryForPolicy(String policyKey) {
     return _readPositiveInt(
-            _policyConfig(policyKey, 'native_config')['every']) ??
+          _policyConfigValue(policyKey, 'native_config', 'every'),
+        ) ??
+        _readPositiveInt(_nativeInList['every']) ??
         0;
   }
 
   int nativeStartAfterForPolicy(String policyKey) {
     return _readNonNegativeInt(
-            _policyConfig(policyKey, 'native_config')['start_after']) ??
+          _policyConfigValue(policyKey, 'native_config', 'start_after'),
+        ) ??
+        _readNonNegativeInt(_nativeInList['start_after']) ??
         0;
   }
 
   int nativeMaxPerListForPolicy(String policyKey) {
     return _readNonNegativeInt(
-            _policyConfig(policyKey, 'native_config')['max_per_list']) ??
+          _policyConfigValue(policyKey, 'native_config', 'max_per_list'),
+        ) ??
+        _readNonNegativeInt(_nativeInList['max_per_list']) ??
         0;
   }
 
-  Map<String, dynamic> _interstitialForPolicy(String policyKey) {
-    return _policyConfig(policyKey, 'interstitial_config');
+  Duration interstitialCooldownForTab(String tabKey) {
+    final seconds = _readPositiveInt(_policyConfigValue(
+          tabKey,
+          'interstitial_config',
+          'cooldown_seconds',
+        )) ??
+        _readPositiveInt(_interstitialConfig['cooldown_seconds']);
+    return Duration(seconds: seconds ?? interstitialCooldown.inSeconds);
   }
 
-  Duration interstitialCooldownForTab(String tabKey) {
-    final resolved = _resolvePolicyForKey(tabKey);
-    final config = _interstitialForPolicy(tabKey);
-    final seconds = _readPositiveInt(config['cooldown_seconds']) ??
-        _readPositiveInt(resolved?['cooldown']);
-    return Duration(seconds: seconds ?? interstitialCooldown.inSeconds);
+  int interstitialEverySafeActionsForPolicy(String policyKey) {
+    return _readPositiveInt(_policyConfigValue(
+          policyKey,
+          'interstitial_config',
+          'every_n_safe_actions',
+        )) ??
+        _readPositiveInt(_interstitialConfig['every_n_safe_actions']) ??
+        0;
+  }
+
+  int interstitialMinimumLaunchDelayForPolicy(String policyKey) {
+    return _readNonNegativeInt(_policyConfigValue(
+          policyKey,
+          'interstitial_config',
+          'minimum_launch_delay_seconds',
+        )) ??
+        _readNonNegativeInt(
+          _interstitialConfig['minimum_launch_delay_seconds'],
+        ) ??
+        0;
+  }
+
+  int interstitialMaximumPerSessionForPolicy(String policyKey) {
+    return _readNonNegativeInt(_policyConfigValue(
+          policyKey,
+          'interstitial_config',
+          'maximum_per_session',
+        )) ??
+        _readNonNegativeInt(_interstitialConfig['maximum_per_session']) ??
+        0;
+  }
+
+  int interstitialMinimumPageDwellForPolicy(String policyKey) {
+    return _readNonNegativeInt(_policyConfigValue(
+          policyKey,
+          'interstitial_config',
+          'minimum_page_dwell_seconds',
+        )) ??
+        _readNonNegativeInt(
+          _interstitialConfig['minimum_page_dwell_seconds'],
+        ) ??
+        0;
+  }
+
+  void markInterstitialPolicyEntered(
+    String policyKey, {
+    DateTime? enteredAt,
+    bool reset = false,
+  }) {
+    final canonicalKey = _canonicalPolicyKey(policyKey);
+    if (canonicalKey.isEmpty) return;
+    if (!reset &&
+        _activeInterstitialPolicyKey == canonicalKey &&
+        _activeInterstitialPolicyEnteredAt != null) {
+      return;
+    }
+    _activeInterstitialPolicyKey = canonicalKey;
+    _activeInterstitialPolicyEnteredAt = enteredAt ?? DateTime.now();
+  }
+
+  bool isInterstitialDwellSatisfied(
+    String policyKey, {
+    DateTime? now,
+  }) {
+    final canonicalKey = _canonicalPolicyKey(policyKey);
+    final requiredSeconds = interstitialMinimumPageDwellForPolicy(canonicalKey);
+    if (requiredSeconds <= 0) return true;
+    if (_activeInterstitialPolicyKey != canonicalKey) return false;
+    final enteredAt = _activeInterstitialPolicyEnteredAt;
+    if (enteredAt == null) return false;
+    return (now ?? DateTime.now()).difference(enteredAt).inSeconds >=
+        requiredSeconds;
+  }
+
+  bool isInterstitialSessionCapReached(
+    String policyKey, {
+    int? shownCount,
+  }) {
+    final maximum = interstitialMaximumPerSessionForPolicy(policyKey);
+    return maximum > 0 &&
+        (shownCount ?? _interstitialShowsThisSession) >= maximum;
   }
 
   bool bannerAllowedForTab(String tabKey) {
@@ -370,8 +563,11 @@ class AdsService {
 
   bool nativeInListAllowedForTab(String tabKey) {
     if (!nativeAllowedForTab(tabKey)) return false;
-    final config = _policyConfig(tabKey, 'native_config');
-    return _boolFromDynamic(config['enabled'], fallback: nativeInListEnabled);
+    if (!hasUnitForFormat('native')) return false;
+    return _boolFromDynamic(
+      _policyConfigValue(tabKey, 'native_config', 'enabled'),
+      fallback: nativeInListEnabled,
+    );
   }
 
   bool shouldInsertNativeAfterItem({
@@ -384,69 +580,62 @@ class AdsService {
     final every = nativeEveryForPolicy(tabKey);
     if (every <= 0) return false;
 
-    final configuredStart = nativeStartAfterForPolicy(tabKey);
-    final startAfter = configuredStart < 1 ? 1 : configuredStart;
+    final startAfter = nativeStartAfterForPolicy(tabKey);
     final itemNumber = itemIndex + 1;
+    final firstInsertionItemNumber = startAfter == 0 ? every : startAfter;
 
-    if (itemNumber < startAfter) return false;
+    if (itemNumber < firstInsertionItemNumber) return false;
 
-    return (itemNumber - startAfter) % every == 0;
+    if ((itemNumber - firstInsertionItemNumber) % every != 0) return false;
+
+    final maxPerList = nativeMaxPerListForPolicy(tabKey);
+    if (maxPerList == 0) return true;
+    final insertionNumber =
+        ((itemNumber - firstInsertionItemNumber) ~/ every) + 1;
+    return insertionNumber <= maxPerList;
+  }
+
+  String configuredUnitId(String format, {bool debug = kDebugMode}) {
+    if (debug) {
+      switch (format) {
+        case 'banner':
+          return debugBannerUnitId;
+        case 'native':
+          return debugNativeUnitId;
+        case 'interstitial':
+          return debugInterstitialUnitId;
+      }
+    }
+
+    final units = _ads['units'];
+    if (units is Map) {
+      final value = units[format]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+
+    final global = _ads['global'];
+    if (global is Map) {
+      final value = global['${format}_unit_id']?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+
+    return '';
+  }
+
+  bool hasUnitForFormat(String format, {bool debug = kDebugMode}) {
+    return configuredUnitId(format, debug: debug).isNotEmpty;
   }
 
   String get bannerUnitId {
-    if (kDebugMode) return debugBannerUnitId;
-
-    final units = _ads['units'];
-    if (units is Map) {
-      final value = units['banner']?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
-    }
-
-    final global = _ads['global'];
-    if (global is Map) {
-      final value = global['banner_unit_id']?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
-    }
-
-    return fallbackBannerUnitId;
+    return configuredUnitId('banner');
   }
 
   String get interstitialUnitId {
-    if (kDebugMode) return debugInterstitialUnitId;
-
-    final units = _ads['units'];
-    if (units is Map) {
-      final value = units['interstitial']?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
-    }
-
-    final global = _ads['global'];
-    if (global is Map) {
-      final value = global['interstitial_unit_id']?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
-    }
-
-    return fallbackInterstitialUnitId;
+    return configuredUnitId('interstitial');
   }
 
   String get nativeUnitId {
-    if (kDebugMode) return debugNativeUnitId;
-
-    final units = _ads['units'];
-    if (units is Map) {
-      final value = units['native']?.toString().trim() ??
-          units['native_advanced']?.toString().trim() ??
-          '';
-      if (value.isNotEmpty) return value;
-    }
-
-    final global = _ads['global'];
-    if (global is Map) {
-      final value = global['native_unit_id']?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
-    }
-
-    return fallbackNativeUnitId;
+    return configuredUnitId('native');
   }
 
   BannerAd? getBannerOrCreate({
@@ -455,6 +644,7 @@ class AdsService {
     if (kIsWeb) return null;
     if (!_adsEnabled()) return null;
     if (!_formatEnabled('banner')) return null;
+    if (!hasUnitForFormat('banner')) return null;
 
     final sameSize = _banner != null &&
         _bannerSize != null &&
@@ -508,7 +698,10 @@ class AdsService {
     return getBannerOrCreate(size: size);
   }
 
-  void preloadInterstitial({String? tabKey}) {
+  void preloadInterstitial({String? tabKey, bool resetDwell = false}) {
+    if (tabKey != null) {
+      markInterstitialPolicyEntered(tabKey, reset: resetDwell);
+    }
     unawaited(_preloadInterstitial(tabKey: tabKey));
   }
 
@@ -516,6 +709,7 @@ class AdsService {
     if (kIsWeb) return;
     if (!_adsEnabled()) return;
     if (!_formatEnabled('interstitial')) return;
+    if (!hasUnitForFormat('interstitial')) return;
     if (tabKey != null && !interstitialAllowedForTab(tabKey)) return;
     if (_loadingInterstitial) return;
     if (_interstitial != null) return;
@@ -528,6 +722,7 @@ class AdsService {
     if (!acquired) return;
 
     _loadingInterstitial = true;
+    final requestGeneration = _interstitialRequestGeneration;
 
     try {
       InterstitialAd.load(
@@ -535,6 +730,10 @@ class AdsService {
         request: const AdRequest(),
         adLoadCallback: InterstitialAdLoadCallback(
           onAdLoaded: (ad) {
+            if (requestGeneration != _interstitialRequestGeneration) {
+              ad.dispose();
+              return;
+            }
             if (kDebugMode) {
               debugPrint(
                   '[AdsLoad] format=interstitial status=loaded policy=${tabKey ?? 'global'}');
@@ -546,6 +745,9 @@ class AdsService {
             _loadingInterstitial = false;
           },
           onAdFailedToLoad: (error) {
+            if (requestGeneration != _interstitialRequestGeneration) {
+              return;
+            }
             if (kDebugMode) {
               debugPrint(
                 '[AdsLoadError] format=interstitial policy=${tabKey ?? 'global'} '
@@ -616,24 +818,29 @@ class AdsService {
       logDecision('placement_off');
       return;
     }
+    if (!hasUnitForFormat('interstitial')) {
+      logDecision('unit_unavailable');
+      return;
+    }
 
     final canonicalPolicyKey = _canonicalPolicyKey(tabKey);
-    final policyConfig = _interstitialForPolicy(canonicalPolicyKey);
+    markInterstitialPolicyEntered(canonicalPolicyKey);
     final everySafeActions =
-        _readPositiveInt(policyConfig['every_n_safe_actions']) ?? 0;
+        interstitialEverySafeActionsForPolicy(canonicalPolicyKey);
     final minimumLaunchDelay =
-        _readNonNegativeInt(policyConfig['minimum_launch_delay_seconds']) ?? 0;
-    final maximumPerSession =
-        _readNonNegativeInt(policyConfig['maximum_per_session']) ?? 0;
+        interstitialMinimumLaunchDelayForPolicy(canonicalPolicyKey);
 
     if (DateTime.now().difference(_sessionStartedAt).inSeconds <
         minimumLaunchDelay) {
       logDecision('launch_delay');
       return;
     }
-    if (maximumPerSession > 0 &&
-        _interstitialShowsThisSession >= maximumPerSession) {
+    if (isInterstitialSessionCapReached(canonicalPolicyKey)) {
       logDecision('session_cap');
+      return;
+    }
+    if (!isInterstitialDwellSatisfied(canonicalPolicyKey)) {
+      logDecision('page_dwell');
       return;
     }
 
@@ -641,7 +848,7 @@ class AdsService {
 
     if (everySafeActions <= 0 || _safeActionCount < everySafeActions) {
       logDecision('action_threshold');
-      preloadInterstitial(tabKey: canonicalPolicyKey);
+      preloadInterstitial(tabKey: canonicalPolicyKey, resetDwell: false);
       return;
     }
 
@@ -650,7 +857,7 @@ class AdsService {
     if (_lastInterstitial != null &&
         now.difference(_lastInterstitial!) < effectiveCooldown) {
       logDecision('cooldown');
-      preloadInterstitial(tabKey: tabKey);
+      preloadInterstitial(tabKey: tabKey, resetDwell: false);
       return;
     }
 
@@ -671,7 +878,7 @@ class AdsService {
         _loadedInterstitialPolicyKey = null;
       }
       logDecision('not_ready_for_policy');
-      preloadInterstitial(tabKey: canonicalPolicyKey);
+      preloadInterstitial(tabKey: canonicalPolicyKey, resetDwell: false);
 
       final deadline = DateTime.now().add(const Duration(seconds: 3));
       while (DateTime.now().isBefore(deadline) &&
@@ -696,12 +903,39 @@ class AdsService {
       }
     }
 
+    final preShowNow = DateTime.now();
+    final currentEverySafeActions =
+        interstitialEverySafeActionsForPolicy(canonicalPolicyKey);
+    final currentCooldown = interstitialCooldownForTab(canonicalPolicyKey);
+    final cooldownSatisfied = _lastInterstitial == null ||
+        preShowNow.difference(_lastInterstitial!) >= currentCooldown;
+    final eligibleImmediatelyBeforeShow = _adsEnabled() &&
+        _formatEnabled('interstitial') &&
+        hasUnitForFormat('interstitial') &&
+        interstitialAllowedForTab(canonicalPolicyKey) &&
+        currentEverySafeActions > 0 &&
+        _safeActionCount >= currentEverySafeActions &&
+        !isInterstitialSessionCapReached(canonicalPolicyKey) &&
+        isInterstitialDwellSatisfied(canonicalPolicyKey) &&
+        preShowNow.difference(_sessionStartedAt).inSeconds >=
+            interstitialMinimumLaunchDelayForPolicy(canonicalPolicyKey) &&
+        cooldownSatisfied;
+    if (!eligibleImmediatelyBeforeShow) {
+      ad.dispose();
+      _interstitial = null;
+      _loadedInterstitialPolicyKey = null;
+      logDecision('pre_show_recheck_failed');
+      return;
+    }
+
     logDecision('show');
     final completer = Completer<void>();
     _interstitial = null;
-    _safeActionCount = 0;
 
     ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (_) {
+        _safeActionCount = 0;
+      },
       onAdDismissedFullScreenContent: (ad) {
         try {
           ad.dispose();
@@ -709,7 +943,7 @@ class AdsService {
         _lastInterstitial = DateTime.now();
         _interstitialShowsThisSession++;
         _loadedInterstitialPolicyKey = null;
-        preloadInterstitial(tabKey: canonicalPolicyKey);
+        preloadInterstitial(tabKey: canonicalPolicyKey, resetDwell: false);
         if (!completer.isCompleted) completer.complete();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
@@ -723,7 +957,7 @@ class AdsService {
           ad.dispose();
         } catch (_) {}
         _loadedInterstitialPolicyKey = null;
-        preloadInterstitial(tabKey: canonicalPolicyKey);
+        preloadInterstitial(tabKey: canonicalPolicyKey, resetDwell: false);
         if (!completer.isCompleted) completer.complete();
       },
     );
@@ -739,7 +973,7 @@ class AdsService {
       try {
         ad.dispose();
       } catch (_) {}
-      preloadInterstitial(tabKey: tabKey);
+      preloadInterstitial(tabKey: tabKey, resetDwell: false);
       if (!completer.isCompleted) completer.complete();
     }
 
@@ -758,12 +992,19 @@ class AdsService {
     _nativeInList = <String, dynamic>{};
     _interstitialConfig = <String, dynamic>{};
     _safeActionCount = 0;
+    _interstitialShowsThisSession = 0;
+    _lastInterstitial = null;
+    _loadedInterstitialPolicyKey = null;
+    _activeInterstitialPolicyKey = null;
+    _activeInterstitialPolicyEnteredAt = null;
     interstitialCooldown = const Duration(seconds: 60);
     interstitialEverySafeActions = 4;
     dispose();
+    policyRevision.value = policyRevision.value + 1;
   }
 
   void dispose() {
+    _interstitialRequestGeneration++;
     try {
       _banner?.dispose();
     } catch (_) {}
@@ -775,11 +1016,80 @@ class AdsService {
     _banner = null;
     _bannerSize = null;
     _interstitial = null;
+    _loadedInterstitialPolicyKey = null;
     _loadingInterstitial = false;
     _activeLoads.clear();
     _formatBlockedUntil.clear();
     _placementLastAttempt.clear();
     _lastAnyAdAttempt = null;
+  }
+
+  bool _isValidAdsContract(dynamic value) {
+    if (!_isStringKeyedMap(value) || !_isBooleanLike(value['enabled'])) {
+      return false;
+    }
+
+    final formats = value['formats'];
+    final units = value['units'];
+    final tabs = value['tabs'];
+    final nativeInList = value['native_in_list'];
+    final interstitial = value['interstitial'];
+    if (!_isStringKeyedMap(formats) ||
+        !_isStringKeyedMap(units) ||
+        !_isStringKeyedMap(tabs) ||
+        !_isStringKeyedMap(nativeInList) ||
+        !_isStringKeyedMap(interstitial)) {
+      return false;
+    }
+
+    for (final format in const ['banner', 'native', 'interstitial']) {
+      if (!_isBooleanLike(formats[format]) || !units.containsKey(format)) {
+        return false;
+      }
+      final unit = units[format];
+      if (unit != null && unit is! String) return false;
+    }
+
+    for (final entry in tabs.entries) {
+      final policy = entry.value;
+      if (entry.key is! String || !_isStringKeyedMap(policy)) return false;
+      for (final gate in const [
+        'enabled',
+        'banner',
+        'native',
+        'interstitial'
+      ]) {
+        if (!_isBooleanLike(policy[gate])) return false;
+      }
+      for (final config in const [
+        'banner_config',
+        'native_config',
+        'interstitial_config',
+      ]) {
+        if (policy.containsKey(config) && !_isStringKeyedMap(policy[config])) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  bool _isStringKeyedMap(dynamic value) {
+    return value is Map && value.keys.every((key) => key is String);
+  }
+
+  bool _isBooleanLike(dynamic value) {
+    if (value is bool || value is num) return true;
+    if (value is String) {
+      const accepted = {'true', 'false', '1', '0', 'yes', 'no', 'on', 'off'};
+      return accepted.contains(value.trim().toLowerCase());
+    }
+    return false;
+  }
+
+  @visibleForTesting
+  void setInterstitialSessionCountForTesting(int value) {
+    _interstitialShowsThisSession = value < 0 ? 0 : value;
   }
 
   bool _boolFromDynamic(dynamic value, {required bool fallback}) {

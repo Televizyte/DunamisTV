@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/ads_service.dart';
+import '../../../ui/widgets/ads/native_inline_ad_tile.dart';
+import '../../../ui/widgets/banner_ad_widget.dart';
 import '../models/dynamic_section.dart';
 import '../models/short_video_item.dart';
 import 'dynamic_card_renderer.dart';
@@ -824,8 +827,60 @@ class _AdPlaceholderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Backend ad sections must never show fake placeholder UI to users.
-    // Real ads are handled by shared backend-controlled ad widgets.
+    return ValueListenableBuilder<int>(
+      valueListenable: AdsService.instance.policyRevision,
+      builder: (context, _, __) => _buildForPolicy(context),
+    );
+  }
+
+  Widget _buildForPolicy(BuildContext context) {
+    final settings = section.settings;
+    final format = (settings['ad_format'] ??
+            settings['format'] ??
+            settings['placement_format'] ??
+            '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final policyKey = (settings['policy_key'] ??
+            settings['route_key'] ??
+            settings['ad_policy_key'] ??
+            '')
+        .toString()
+        .trim();
+    if (policyKey.isEmpty) return const SizedBox.shrink();
+
+    final ads = AdsService.instance;
+    if (format == 'banner') {
+      if (!ads.bannerAllowedForPlacement(policyKey, 'page_bottom') ||
+          !ads.hasUnitForFormat('banner')) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: padding,
+        child: BannerAdWidget(
+          tabKey: policyKey,
+          placement: 'page_bottom',
+        ),
+      );
+    }
+    if (format == 'native') {
+      if (!ads.nativeAllowedForTab(policyKey) ||
+          !ads.hasUnitForFormat('native')) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: padding,
+        child: NativeInlineAdTile(
+          tabKey: policyKey,
+          label: section.title.trim().isEmpty ? 'Sponsored' : section.title,
+          minHeight: _sectionCardHeight(section, fallback: 120),
+          margin: EdgeInsets.zero,
+        ),
+      );
+    }
+
+    // Interstitial sections and malformed/unsupported formats fail closed.
     return const SizedBox.shrink();
   }
 }

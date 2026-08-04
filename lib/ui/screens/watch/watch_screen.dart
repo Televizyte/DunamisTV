@@ -27,7 +27,11 @@ class WatchScreen extends StatelessWidget {
     final hub = HubScope.of(context);
 
     return AnimatedBuilder(
-      animation: Listenable.merge([hub, ThemeController.instance]),
+      animation: Listenable.merge([
+        hub,
+        ThemeController.instance,
+        AdsService.instance.policyRevision,
+      ]),
       builder: (context, _) {
         final isLight = ThemeController.instance.isLightMode;
         final cards = _buildWatchCards(hub);

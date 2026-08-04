@@ -30,6 +30,7 @@ class SodQuotesScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: Listenable.merge([
         ThemeController.instance,
+        AdsService.instance.policyRevision,
         if (store != null) store,
       ]),
       builder: (context, _) {

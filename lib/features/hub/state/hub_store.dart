@@ -498,6 +498,7 @@ class HubStore extends ChangeNotifier {
       );
 
       if (normalized.isNotEmpty) {
+        applyRefreshedAdPolicy(bootstrap);
         _data = normalized;
         _lastUpdated = DateTime.now();
         await _saveCache(normalized);
@@ -515,6 +516,11 @@ class HubStore extends ChangeNotifier {
     } finally {
       _backgroundRefreshing = false;
     }
+  }
+
+  @visibleForTesting
+  void applyRefreshedAdPolicy(Map<String, dynamic> bootstrap) {
+    AdsService.instance.applyBootstrap(bootstrap);
   }
 
   List<Map<String, dynamic>> _previousInspireItems(

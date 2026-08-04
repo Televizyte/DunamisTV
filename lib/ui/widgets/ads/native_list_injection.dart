@@ -32,8 +32,7 @@ class NativeListInjection {
     }
 
     final every = ads.nativeEveryForPolicy(tabKey);
-    final configuredStart = ads.nativeStartAfterForPolicy(tabKey);
-    final startAfter = configuredStart < 1 ? 1 : configuredStart;
+    final startAfter = ads.nativeStartAfterForPolicy(tabKey);
     if (every <= 0) return _itemOnlyEntries(items);
 
     final out = <NativeListEntry<T>>[];

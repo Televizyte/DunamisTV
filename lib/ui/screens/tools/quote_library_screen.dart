@@ -38,8 +38,19 @@ class _QuoteLibraryScreenState extends State<QuoteLibraryScreen> {
   @override
   void initState() {
     super.initState();
+    AdsService.instance.policyRevision.addListener(_handlePolicyRevision);
     load();
     AdsService.instance.preloadInterstitial(tabKey: 'explore');
+  }
+
+  void _handlePolicyRevision() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AdsService.instance.policyRevision.removeListener(_handlePolicyRevision);
+    super.dispose();
   }
 
   Future<void> load() async {
