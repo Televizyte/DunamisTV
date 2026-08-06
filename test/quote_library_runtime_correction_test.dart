@@ -146,11 +146,17 @@ void main() {
   testWidgets(
     'valid design uses shared renderer and malformed design falls back',
     (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       final designed = _item({
         'design': {'background_color': '#112233', 'text_color': '#ffffff'},
       });
       await tester.pumpWidget(_presentation(designed));
       expect(find.byType(DxmDynamicQuoteCard), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
 
       final malformed = _item({'design_json': '{not valid json'});
       await tester.pumpWidget(_presentation(malformed));
