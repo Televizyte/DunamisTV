@@ -10,6 +10,7 @@ import '../../shell/bottom_shell.dart';
 import '../../widgets/dxm_top_bar.dart';
 import '../../widgets/gradient_page_background.dart';
 import '../../widgets/ads/native_inline_ad_tile.dart';
+import '../../widgets/ads/native_list_injection.dart';
 
 class ExploreScreen extends StatelessWidget {
   const ExploreScreen({super.key});
@@ -77,12 +78,6 @@ class ExploreScreen extends StatelessWidget {
       }
 
       var effective = section;
-      if (section.isCarousel) {
-        effective = section.copyWith(
-          title: 'Featured Explore',
-          subtitle: section.subtitle,
-        );
-      }
 
       if (_isToolsSection(section)) {
         final tools = <_ExploreItemData>[];
@@ -96,11 +91,7 @@ class ExploreScreen extends StatelessWidget {
         if (tools.isEmpty) {
           continue;
         }
-        effective = section.copyWith(
-          title: 'Quick Tools',
-          subtitle: 'Create, capture ideas and study Scripture.',
-          items: tools,
-        );
+        effective = section.copyWith(items: tools);
       }
 
       normalized.add(effective);
@@ -116,6 +107,7 @@ class ExploreScreen extends StatelessWidget {
           variant: 'image_grid',
           columns: 1,
           order: 60,
+          placement: 'resources',
           items: bookItems,
         ),
       );
@@ -134,41 +126,37 @@ class ExploreScreen extends StatelessWidget {
       });
 
     final widgets = <Widget>[];
-    var firstNativeInserted = false;
-    var secondNativeInserted = false;
-
-    for (final section in ordered) {
-      widgets.add(_ExploreBackendSection(section: section, onOpen: onOpen));
-
-      if (_isToolsSection(section) && !firstNativeInserted) {
+    final entries =
+        NativeListInjection.buildEntries(ordered, tabKey: 'explore');
+    for (final entry in entries) {
+      if (entry.isAd) {
         widgets.add(
-          const NativeInlineAdTile(
+          NativeInlineAdTile(
+            key: ValueKey('explore.native.${entry.itemIndex}'),
             tabKey: 'explore',
             label: 'Sponsored',
             minHeight: 118,
-            margin: EdgeInsets.only(bottom: 24),
+            margin: const EdgeInsets.only(bottom: 24),
           ),
         );
-        firstNativeInserted = true;
+        continue;
       }
-
-      if (_isBooksSection(section) && !secondNativeInserted) {
-        widgets.add(
-          const NativeInlineAdTile(
-            tabKey: 'explore',
-            label: 'Sponsored',
-            minHeight: 118,
-            margin: EdgeInsets.only(bottom: 24),
-          ),
-        );
-        secondNativeInserted = true;
-      }
+      final section = entry.item!;
+      widgets.add(
+        _ExploreBackendSection(
+          key: ValueKey('explore.section.${section.key}'),
+          section: section,
+          onOpen: onOpen,
+        ),
+      );
     }
 
     return widgets;
   }
 
   static int _sectionPriority(_ExploreSectionData section) {
+    final explicit = ExploreReleaseContract.zonePriority(section.placement);
+    if (explicit != null) return explicit;
     if (section.isCarousel) return 10;
     if (_isToolsSection(section)) return 20;
     if (_isShortsSection(section)) return 40;
@@ -197,16 +185,19 @@ class ExploreScreen extends StatelessWidget {
   }
 
   static bool _isBooksSection(_ExploreSectionData section) {
+    if (section.placement == 'resources') return true;
     final clean = '${section.key} ${section.title}'.toLowerCase();
-    return clean.contains('book') ||
-        clean.contains('resource') ||
-        clean.contains('library');
+    return clean.contains('book') || clean.contains('resource');
   }
 
   static bool _isBookItem(_ExploreItemData item) {
     final clean =
         '${item.title} ${item.route} ${item.sourceRoute}'.toLowerCase();
-    return clean.contains('book') || clean.contains('library');
+    if (ExploreReleaseContract.isQuoteLibraryRoute(item.route) ||
+        ExploreReleaseContract.isShortVideoLibraryRoute(item.route)) {
+      return false;
+    }
+    return clean.contains('book');
   }
 
   static bool _isToolsSection(_ExploreSectionData section) {
@@ -508,6 +499,19 @@ class ExploreScreen extends StatelessWidget {
       'order',
       'sort_order',
     ]);
+    final placement = ExploreReleaseContract.normalizeZone(_firstNonEmpty([
+      _firstString(section, const ['placement', 'placement_zone', 'zone']),
+      _firstStringFromNested(
+        section,
+        'settings',
+        const ['placement', 'placement_zone', 'zone'],
+      ),
+      _firstStringFromNested(
+        section,
+        'meta',
+        const ['placement', 'placement_zone', 'zone'],
+      ),
+    ]));
 
     final items = <_ExploreItemData>[];
     for (final rawItem in rawItems) {
@@ -525,6 +529,7 @@ class ExploreScreen extends StatelessWidget {
       variant: variant,
       columns: columns,
       order: order,
+      placement: placement,
       items: items,
       dynamicSection: HubDynamicSection.fromMap(section),
     );
@@ -581,6 +586,16 @@ class ExploreScreen extends StatelessWidget {
     if (title.trim().isEmpty) return null;
 
     final rawRoute = _firstNonEmpty([
+      _firstDeepStringForKeys(item, const [
+        'engine_key',
+        'engineKey',
+        'action_key',
+        'actionKey',
+        'renderer_key',
+        'rendererKey',
+        'content_type',
+        'contentType',
+      ]),
       _firstDeepStringForKeys(item, const [
         'route',
         'path',
@@ -1026,6 +1041,9 @@ class ExploreScreen extends StatelessWidget {
     required String title,
     String parentKey = '',
   }) {
+    final resolved =
+        ExploreReleaseContract.resolveRoute(rawRoute, title: title);
+    if (resolved.isNotEmpty) return resolved;
     final clean = rawRoute.trim();
     final lower = clean.toLowerCase();
     final lowerTitle = title.trim().toLowerCase();
@@ -1085,7 +1103,6 @@ class ExploreScreen extends StatelessWidget {
     }
 
     if (lowerTitle.contains('book reader') ||
-        lowerTitle.contains('library') ||
         lower == 'books' ||
         lower == 'book_reader' ||
         lower == 'book-reader' ||
@@ -1200,6 +1217,110 @@ class ExploreScreen extends StatelessWidget {
   }
 }
 
+class ExploreReleaseContract {
+  const ExploreReleaseContract._();
+
+  static const _exactRoutes = <String>{
+    '/quotes-scripture/library',
+    '/quotes-scripture/reader',
+    '/short-videos/library',
+    '/short-videos',
+    '/tools/quote',
+    '/tools/books',
+  };
+
+  static String resolveRoute(String value, {String title = ''}) {
+    final raw = value.trim();
+    final key = normalizeKey(raw);
+    if (_exactRoutes.contains(raw.toLowerCase())) return raw.toLowerCase();
+
+    switch (key) {
+      case 'quote_library':
+      case 'quotes_library':
+      case 'quotes_scripture':
+      case 'quotes_scripture_library':
+        return '/quotes-scripture/library';
+      case 'short_video_library':
+      case 'short_videos_library':
+      case 'shorts_library':
+        return '/short-videos/library';
+      case 'short_video_feed':
+      case 'short_videos':
+      case 'short_video':
+      case 'shorts':
+      case 'reels':
+        return '/short-videos';
+      case 'quote_creator':
+        return '/tools/quote';
+      case 'books':
+      case 'books_library':
+      case 'book_reader':
+      case 'books_reader':
+        return '/tools/books';
+    }
+
+    final normalizedTitle = normalizeKey(title);
+    if (normalizedTitle.contains('quote_library') ||
+        normalizedTitle.contains('quotes_scripture')) {
+      return '/quotes-scripture/library';
+    }
+    if (normalizedTitle.contains('short_video_library')) {
+      return '/short-videos/library';
+    }
+    return '';
+  }
+
+  static bool isQuoteLibraryRoute(String value) =>
+      resolveRoute(value) == '/quotes-scripture/library';
+
+  static bool isShortVideoLibraryRoute(String value) =>
+      resolveRoute(value) == '/short-videos/library';
+
+  static String normalizeZone(String value) {
+    final key = normalizeKey(value);
+    const aliases = <String, String>{
+      'featured': 'featured',
+      'quick_tools': 'quick_tools',
+      'tools': 'quick_tools',
+      'media': 'media',
+      'libraries': 'libraries',
+      'library': 'libraries',
+      'resources': 'resources',
+      'resource': 'resources',
+      'games': 'games',
+      'custom': 'custom',
+    };
+    return aliases[key] ?? '';
+  }
+
+  static int? zonePriority(String value) {
+    switch (normalizeZone(value)) {
+      case 'featured':
+        return 10;
+      case 'quick_tools':
+        return 20;
+      case 'media':
+        return 40;
+      case 'libraries':
+        return 50;
+      case 'custom':
+        return 55;
+      case 'resources':
+        return 60;
+      case 'games':
+        return 70;
+    }
+    return null;
+  }
+
+  static String normalizeKey(String value) => value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^_|_$'), '');
+}
+
 class _ExploreSectionData {
   final String key;
   final String title;
@@ -1208,6 +1329,7 @@ class _ExploreSectionData {
   final String variant;
   final int columns;
   final int order;
+  final String placement;
   final List<_ExploreItemData> items;
   final HubDynamicSection? dynamicSection;
 
@@ -1219,6 +1341,7 @@ class _ExploreSectionData {
     required this.variant,
     required this.columns,
     required this.order,
+    this.placement = '',
     required this.items,
     this.dynamicSection,
   });
@@ -1243,6 +1366,7 @@ class _ExploreSectionData {
       variant: variant,
       columns: columns,
       order: order,
+      placement: placement,
       items: items ?? this.items,
       dynamicSection: dynamicSection,
     );
@@ -1302,7 +1426,9 @@ bool _looksLikeShortVideoSection(HubDynamicSection section) {
       return;
     }
     if (value is Iterable) {
-      for (final item in value) add(item);
+      for (final item in value) {
+        add(item);
+      }
       return;
     }
     buffer.write(' ');
@@ -1446,7 +1572,11 @@ class _ExploreBackendSection extends StatelessWidget {
   final _ExploreSectionData section;
   final ValueChanged<_ExploreItemData> onOpen;
 
-  const _ExploreBackendSection({required this.section, required this.onOpen});
+  const _ExploreBackendSection({
+    super.key,
+    required this.section,
+    required this.onOpen,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1801,17 +1931,6 @@ class _ExploreSectionGrid extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-class _ExploreNativeAdBlock extends StatelessWidget {
-  const _ExploreNativeAdBlock();
-
-  @override
-  Widget build(BuildContext context) {
-    // Native ads are injected only when the backend ad policy allows them.
-    // Do not show frontend placeholder cards when a real ad is unavailable.
-    return const SizedBox.shrink();
   }
 }
 

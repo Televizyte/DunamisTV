@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../features/hub/state/hub_scope.dart';
+import '../../shared/designers/dxm_design_parser.dart';
+import '../../shared/designers/dxm_dynamic_quote_card.dart';
 import '../../widgets/ads/native_inline_ad_tile.dart';
+import '../../widgets/ads/native_list_injection.dart';
 import '../../widgets/dxm_top_bar.dart';
 import '../../widgets/gradient_page_background.dart';
 
@@ -23,6 +28,8 @@ class _QuotesScriptureLibraryScreenState
     extends State<QuotesScriptureLibraryScreen> {
   String _category = '';
   int _visibleCount = 30;
+  Map<String, dynamic>? _cachedRaw;
+  List<QuoteScriptureLibraryItem> _cachedItems = const [];
 
   @override
   void initState() {
@@ -37,9 +44,12 @@ class _QuotesScriptureLibraryScreenState
     return AnimatedBuilder(
       animation: store ?? _NoopListenable(),
       builder: (context, _) {
-        final allItems = QuoteScriptureLibraryMapper.fromRawHub(
-          store?.raw ?? const <String, dynamic>{},
-        );
+        final raw = store?.raw ?? const <String, dynamic>{};
+        if (!identical(raw, _cachedRaw)) {
+          _cachedRaw = raw;
+          _cachedItems = QuoteScriptureLibraryMapper.fromRawHub(raw);
+        }
+        final allItems = _cachedItems;
         final categories = QuoteScriptureLibraryMapper.categories(allItems);
         final filtered = _category.isEmpty
             ? allItems
@@ -47,6 +57,10 @@ class _QuotesScriptureLibraryScreenState
                 .where((item) => _normalize(item.categoryKey) == _category)
                 .toList();
         final visible = filtered.take(_visibleCount).toList();
+        final entries = NativeListInjection.buildEntries(
+          visible,
+          tabKey: 'quotes.library',
+        );
 
         return Scaffold(
           body: Column(
@@ -109,11 +123,14 @@ class _QuotesScriptureLibraryScreenState
                         )
                       else
                         SliverList.builder(
-                          itemCount: visible.length +
-                              (visible.length >= 3 ? visible.length ~/ 3 : 0),
+                          itemCount: entries.length,
                           itemBuilder: (context, index) {
-                            if ((index + 1) % 4 == 0) {
-                              return const Padding(
+                            final entry = entries[index];
+                            if (entry.isAd) {
+                              return Padding(
+                                key: ValueKey(
+                                  'quotes.library.native.${entry.itemIndex}',
+                                ),
                                 padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
                                 child: NativeInlineAdTile(
                                   tabKey: 'quotes.library',
@@ -122,12 +139,9 @@ class _QuotesScriptureLibraryScreenState
                                 ),
                               );
                             }
-                            final itemIndex = index - (index ~/ 4);
-                            if (itemIndex >= visible.length) {
-                              return const SizedBox.shrink();
-                            }
-                            final item = visible[itemIndex];
+                            final item = entry.item!;
                             return Padding(
+                              key: ValueKey('quote.${item.id}'),
                               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                               child: _QuoteCard(
                                 item: item,
@@ -193,17 +207,23 @@ class QuoteScriptureReaderScreen extends StatefulWidget {
 class _QuoteScriptureReaderScreenState
     extends State<QuoteScriptureReaderScreen> {
   late final PageController _controller;
+  late final List<NativeListEntry<QuoteScriptureLibraryItem>> _entries;
 
   @override
   void initState() {
     super.initState();
-    final index =
+    _entries = NativeListInjection.buildEntries(
+      widget.items,
+      tabKey: 'quotes.library.reader',
+    );
+    final contentIndex =
         widget.items.indexWhere((item) => item.id == widget.initialId);
-    _controller =
-        PageController(initialPage: _contentToPage(index < 0 ? 0 : index));
+    final safeIndex = contentIndex < 0 ? 0 : contentIndex;
+    final pageIndex = _entries.indexWhere(
+      (entry) => !entry.isAd && entry.itemIndex == safeIndex,
+    );
+    _controller = PageController(initialPage: pageIndex < 0 ? 0 : pageIndex);
   }
-
-  int _contentToPage(int index) => index + (index ~/ 3);
 
   @override
   void dispose() {
@@ -213,17 +233,19 @@ class _QuoteScriptureReaderScreenState
 
   @override
   Widget build(BuildContext context) {
-    final adCount = widget.items.length ~/ 3;
-    final total = widget.items.length + adCount;
     return Scaffold(
       backgroundColor: const Color(0xFF090713),
       body: PageView.builder(
         controller: _controller,
         scrollDirection: Axis.vertical,
-        itemCount: total,
+        itemCount: _entries.length,
         itemBuilder: (context, pageIndex) {
-          if ((pageIndex + 1) % 4 == 0) {
-            return const ColoredBox(
+          final entry = _entries[pageIndex];
+          if (entry.isAd) {
+            return ColoredBox(
+              key: ValueKey(
+                'quotes.library.reader.native.${entry.itemIndex}',
+              ),
               color: Color(0xFF07070A),
               child: SafeArea(
                 child: Padding(
@@ -275,60 +297,18 @@ class _QuoteScriptureReaderScreenState
               ),
             );
           }
-          final itemIndex = pageIndex - (pageIndex ~/ 4);
-          final item = widget.items[itemIndex];
+          final item = entry.item!;
           return SafeArea(
+            key: ValueKey('quote.reader.${item.id}'),
             child: Stack(
               children: [
                 Positioned.fill(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 90, 24, 90),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF27135E), Color(0xFF9D174D)],
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(28),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              item.categoryLabel,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              item.text,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                height: 1.45,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (item.attribution.isNotEmpty) ...[
-                              const SizedBox(height: 22),
-                              Text(
-                                item.attribution,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                    child: QuoteScripturePresentation(
+                      item: item,
+                      minHeight: 420,
+                      allowVerticalScroll: true,
                     ),
                   ),
                 ),
@@ -366,6 +346,15 @@ class _QuoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (item.design != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: IgnorePointer(
+          child: QuoteScripturePresentation(item: item, minHeight: 220),
+        ),
+      );
+    }
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -412,6 +401,7 @@ class QuoteScriptureLibraryItem {
   final String text;
   final String attribution;
   final Map<String, dynamic> raw;
+  final int channelOrder;
 
   const QuoteScriptureLibraryItem({
     required this.id,
@@ -420,7 +410,123 @@ class QuoteScriptureLibraryItem {
     required this.text,
     required this.attribution,
     required this.raw,
+    this.channelOrder = 0,
   });
+
+  DxmDesignData? get design => QuoteScriptureDesign.resolve(raw);
+}
+
+class QuoteScriptureDesign {
+  const QuoteScriptureDesign._();
+
+  static const _signals = <String>{
+    'design',
+    'design_json',
+    'style',
+    'background_mode',
+    'background_color',
+    'background_image_url',
+    'gradient',
+    'font_family',
+    'font_size',
+    'text_color',
+    'text_align',
+    'card_format',
+    'aspect_ratio',
+    'overlay_style',
+  };
+
+  static DxmDesignData? resolve(Map<String, dynamic> raw) {
+    if (!_containsDesign(raw)) return null;
+    try {
+      final normalized = Map<String, dynamic>.from(raw);
+      for (final key in const ['design', 'design_json', 'style']) {
+        final value = normalized[key];
+        if (value == null || value is Map) continue;
+        if (value is! String || value.trim().isEmpty) return null;
+        final decoded = jsonDecode(value);
+        if (decoded is! Map) return null;
+        normalized[key == 'design_json' ? 'design' : key] =
+            decoded.map((key, value) => MapEntry(key.toString(), value));
+      }
+      return DxmDesignData.fromMap(normalized);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _containsDesign(dynamic value) {
+    if (value is! Map) return false;
+    for (final entry in value.entries) {
+      final key = entry.key.toString().trim().toLowerCase();
+      if (_signals.contains(key)) return true;
+      if (entry.value is Map && _containsDesign(entry.value)) return true;
+    }
+    return false;
+  }
+}
+
+class QuoteScripturePresentation extends StatelessWidget {
+  final QuoteScriptureLibraryItem item;
+  final double minHeight;
+  final bool allowVerticalScroll;
+
+  const QuoteScripturePresentation({
+    super.key,
+    required this.item,
+    required this.minHeight,
+    this.allowVerticalScroll = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final design = item.design;
+    final Widget presentation;
+    if (design == null) {
+      presentation = Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(item.text, textAlign: TextAlign.center),
+              if (item.attribution.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Text(item.attribution, textAlign: TextAlign.center),
+              ],
+            ],
+          ),
+        ),
+      );
+    } else {
+      presentation = LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.hasBoundedWidth
+              ? constraints.maxWidth
+              : MediaQuery.sizeOf(context).width;
+          final width = availableWidth.clamp(1.0, 720.0).toDouble();
+          return Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: width,
+              child: DxmDynamicQuoteCard(
+                mainText: item.text,
+                referenceText: item.attribution,
+                design: design,
+                minHeight: minHeight,
+                enableTapPreview: false,
+              ),
+            ),
+          );
+        },
+      );
+    }
+    if (!allowVerticalScroll) return presentation;
+    return SingleChildScrollView(
+      primary: false,
+      child: presentation,
+    );
+  }
 }
 
 class QuoteScriptureLibraryMapper {
@@ -432,9 +538,21 @@ class QuoteScriptureLibraryMapper {
     final out = <QuoteScriptureLibraryItem>[];
     final seen = <String>{};
 
-    void scan(dynamic value, {String path = ''}) {
+    void scan(
+      dynamic value, {
+      String path = '',
+      _Category? inheritedCategory,
+      int inheritedOrder = 0,
+    }) {
       if (value is List) {
-        for (final item in value) scan(item, path: path);
+        for (final item in value) {
+          scan(
+            item,
+            path: path,
+            inheritedCategory: inheritedCategory,
+            inheritedOrder: inheritedOrder,
+          );
+        }
         return;
       }
       if (value is! Map) return;
@@ -457,8 +575,22 @@ class QuoteScriptureLibraryMapper {
           joined.contains('scripture') ||
           joined.contains('verse') ||
           joined.contains('motivation');
-      if (looksRelevant && text.trim().length >= 12) {
-        final category = _category(joined);
+      final explicitlyQuote = _hasStructuredQuoteIdentity(map);
+      final acceptedAsQuote =
+          looksRelevant || explicitlyQuote || inheritedCategory != null;
+      final containerCategory = map['items'] is List && acceptedAsQuote
+          ? _category(map, joined, path, inheritedCategory)
+          : inheritedCategory;
+      final containerOrder = map['items'] is List
+          ? _int(map, const [
+              'channel_order',
+              'channelOrder',
+              'display_order',
+              'order',
+            ])
+          : inheritedOrder;
+      if (acceptedAsQuote && text.trim().length >= 12) {
+        final category = _category(map, joined, path, inheritedCategory);
         final id =
             _first(map, const ['id', 'content_id', 'post_id', 'slug', 'key']);
         final signature =
@@ -477,17 +609,35 @@ class QuoteScriptureLibraryMapper {
               'subtitle',
             ]),
             raw: Map<String, dynamic>.from(map),
+            channelOrder: _int(
+                map,
+                const [
+                  'channel_order',
+                  'channelOrder',
+                  'display_order',
+                  'order',
+                ],
+                fallback: inheritedOrder),
           ));
         }
       }
       for (final entry in map.entries) {
         if (entry.value is Map || entry.value is List) {
-          scan(entry.value, path: '$path ${entry.key}');
+          scan(
+            entry.value,
+            path: '$path ${entry.key}',
+            inheritedCategory: containerCategory,
+            inheritedOrder: containerOrder,
+          );
         }
       }
     }
 
     scan(rawHub);
+    out.sort((a, b) {
+      final byChannel = a.channelOrder.compareTo(b.channelOrder);
+      return byChannel != 0 ? byChannel : 0;
+    });
     return out;
   }
 
@@ -501,7 +651,49 @@ class QuoteScriptureLibraryMapper {
     return out;
   }
 
-  static _Category _category(String joined) {
+  static _Category _category(
+    Map<String, dynamic> map,
+    String joined,
+    String path,
+    _Category? inherited,
+  ) {
+    final explicitKey = _first(map, const [
+      'channel_key',
+      'channelKey',
+      'source_channel',
+      'sourceChannel',
+      'category_key',
+      'categoryKey',
+    ]);
+    final explicitLabel = _first(map, const [
+      'channel_title',
+      'channelTitle',
+      'channel_label',
+      'channelLabel',
+      'category_label',
+      'categoryLabel',
+      'category',
+    ]);
+    if (explicitKey.isNotEmpty) {
+      final key = normalizeChannelKey(explicitKey);
+      return _Category(
+          key, explicitLabel.isNotEmpty ? explicitLabel : _humanize(key));
+    }
+    if (map['items'] is List) {
+      final sectionKey = _first(
+        map,
+        const ['section_key', 'key', 'slug', 'route_key'],
+      );
+      final sectionLabel = _first(map, const ['title', 'label', 'name']);
+      if (sectionKey.isNotEmpty) {
+        final key = normalizeChannelKey(sectionKey);
+        return _Category(
+          key,
+          sectionLabel.isNotEmpty ? sectionLabel : _humanize(key),
+        );
+      }
+    }
+    if (inherited != null) return inherited;
     if (joined.contains('daily_scripture') ||
         joined.contains('daily scripture') ||
         joined.contains('verse')) {
@@ -520,6 +712,66 @@ class QuoteScriptureLibraryMapper {
       return const _Category('daily_quote', 'Daily Quote');
     }
     return const _Category('other_quotes', 'Other Quotes');
+  }
+
+  static bool _hasStructuredQuoteIdentity(Map<String, dynamic> map) {
+    final type = _first(map, const [
+      'engine_type',
+      'engineType',
+      'type',
+      'renderer_type',
+      'rendererType',
+    ]);
+    final normalizedType = normalizeChannelKey(type);
+    if (normalizedType == 'quote_channel' ||
+        normalizedType == 'quote' ||
+        normalizedType == 'scripture_quote') {
+      return true;
+    }
+
+    final channelKey = _first(map, const [
+      'channel_key',
+      'channelKey',
+      'source_channel',
+      'sourceChannel',
+      'category_key',
+      'categoryKey',
+    ]);
+    if (channelKey.isEmpty) return false;
+
+    return _first(map, const [
+      'quote_text',
+      'scripture_text',
+      'verse_text',
+      'quote',
+    ]).isNotEmpty;
+  }
+
+  static String normalizeChannelKey(String value) => value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^_|_$'), '');
+
+  static String _humanize(String value) => value
+      .split('_')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+
+  static int _int(
+    Map<String, dynamic> map,
+    List<String> keys, {
+    int fallback = 0,
+  }) {
+    for (final key in keys) {
+      final value = map[key];
+      if (value is num) return value.toInt();
+      final parsed = int.tryParse((value ?? '').toString());
+      if (parsed != null) return parsed;
+    }
+    return fallback;
   }
 
   static String _first(Map<String, dynamic> map, List<String> keys) {

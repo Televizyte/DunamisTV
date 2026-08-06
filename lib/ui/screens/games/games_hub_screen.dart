@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../features/hub/state/hub_scope.dart';
 import '../../widgets/banner_ad_widget.dart';
 import '../../widgets/gradient_page_background.dart';
 
@@ -54,6 +55,7 @@ class GamesHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final games = _resolveGames(HubScope.maybeOf(context)?.raw);
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
@@ -133,7 +135,7 @@ class GamesHubScreen extends StatelessWidget {
                       return Wrap(
                         spacing: spacing,
                         runSpacing: spacing,
-                        children: _games
+                        children: games
                             .map(
                               (game) => SizedBox(
                                 width: width,
@@ -159,6 +161,101 @@ class GamesHubScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static List<_GameHubItem> _resolveGames(Map<String, dynamic>? rawHub) {
+    if (rawHub == null || rawHub.isEmpty) return _games;
+    List<dynamic>? configured;
+
+    void scan(dynamic value) {
+      if (configured != null || value is! Map) return;
+      final map = value.map((key, value) => MapEntry(key.toString(), value));
+      final signal = '${map['key']} ${map['section_key']} ${map['title']}'
+          .trim()
+          .toLowerCase();
+      if (signal.contains('game') && map['items'] is List) {
+        configured = map['items'] as List;
+        return;
+      }
+      for (final child in map.values) {
+        if (child is Map) scan(child);
+        if (child is List) {
+          for (final item in child) {
+            scan(item);
+          }
+        }
+      }
+    }
+
+    scan(rawHub);
+    if (configured == null) return _games;
+
+    final byRoute = {for (final game in _games) game.route: game};
+    final resolved = <({int order, _GameHubItem item})>[];
+    var recognizedAny = false;
+    for (var index = 0; index < configured!.length; index++) {
+      final raw = configured![index];
+      if (raw is! Map) continue;
+      final map = raw.map((key, value) => MapEntry(key.toString(), value));
+      final route = GameHubReleaseContract.routeFor(map);
+      final fallback = byRoute[route];
+      if (fallback == null) continue;
+      recognizedAny = true;
+      if (!_enabled(map)) continue;
+      resolved.add((
+        order: _integer(map['display_order'] ?? map['order'], index),
+        item: fallback.copyWith(
+          title: _text(map['title'] ?? map['label'], fallback.title),
+          subtitle:
+              _text(map['subtitle'] ?? map['description'], fallback.subtitle),
+          badge: _text(map['badge'], fallback.badge),
+        ),
+      ));
+    }
+    resolved.sort((a, b) => a.order.compareTo(b.order));
+    return recognizedAny
+        ? resolved.map((entry) => entry.item).toList(growable: false)
+        : _games;
+  }
+
+  static bool _enabled(Map<String, dynamic> map) {
+    final value = map['enabled'] ?? map['is_enabled'];
+    if (value == null) return true;
+    final clean = value.toString().trim().toLowerCase();
+    return clean != '0' && clean != 'false' && clean != 'disabled';
+  }
+
+  static int _integer(dynamic value, int fallback) =>
+      value is num ? value.toInt() : int.tryParse('$value') ?? fallback;
+
+  static String _text(dynamic value, String fallback) {
+    final text = (value ?? '').toString().trim();
+    return text.isEmpty ? fallback : text;
+  }
+}
+
+class GameHubReleaseContract {
+  const GameHubReleaseContract._();
+
+  static const routes = <String>{
+    '/games/dominion-match',
+    '/games/race-of-faith',
+    '/games/kingdom-builder',
+    '/games/bible-quiz',
+  };
+
+  static String routeFor(Map<String, dynamic> map) {
+    final raw = (map['route'] ?? map['path'] ?? map['engine_key'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', '-');
+    if (routes.contains(raw)) return raw;
+    if (raw.contains('dominion-match')) return '/games/dominion-match';
+    if (raw.contains('race-of-faith')) return '/games/race-of-faith';
+    if (raw.contains('kingdom-builder')) return '/games/kingdom-builder';
+    if (raw.contains('bible-quiz')) return '/games/bible-quiz';
+    return '';
   }
 }
 
@@ -381,4 +478,15 @@ class _GameHubItem {
     required this.icon,
     required this.colors,
   });
+
+  _GameHubItem copyWith({String? title, String? subtitle, String? badge}) {
+    return _GameHubItem(
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      route: route,
+      badge: badge ?? this.badge,
+      icon: icon,
+      colors: colors,
+    );
+  }
 }

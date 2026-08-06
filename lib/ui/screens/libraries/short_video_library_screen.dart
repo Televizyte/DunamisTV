@@ -6,6 +6,7 @@ import '../../../features/hub/renderer/short_video_mapper.dart';
 import '../../../features/hub/renderer/short_video_navigation.dart';
 import '../../../features/hub/state/hub_scope.dart';
 import '../../widgets/ads/native_inline_ad_tile.dart';
+import '../../widgets/ads/native_list_injection.dart';
 import '../../widgets/dxm_top_bar.dart';
 import '../../widgets/gradient_page_background.dart';
 
@@ -25,11 +26,13 @@ class ShortVideoLibraryScreen extends StatefulWidget {
 class _ShortVideoLibraryScreenState extends State<ShortVideoLibraryScreen> {
   String _channel = '';
   int _visibleCount = 24;
+  Map<String, dynamic>? _cachedRaw;
+  List<ShortVideoItem> _cachedItems = const [];
 
   @override
   void initState() {
     super.initState();
-    _channel = _normalize(widget.initialChannelKey);
+    _channel = ShortVideoChannelMatcher.normalize(widget.initialChannelKey);
   }
 
   @override
@@ -39,16 +42,27 @@ class _ShortVideoLibraryScreenState extends State<ShortVideoLibraryScreen> {
     return AnimatedBuilder(
       animation: store ?? _NoopListenable(),
       builder: (context, _) {
-        final allItems = ShortVideoMapper.fromRawHub(
-          store?.raw ?? const <String, dynamic>{},
-        ).where((item) => item.enabled && item.hasVideo).toList();
+        final raw = store?.raw ?? const <String, dynamic>{};
+        if (!identical(raw, _cachedRaw)) {
+          _cachedRaw = raw;
+          _cachedItems = ShortVideoMapper.fromRawHub(raw)
+              .where((item) => item.enabled && item.hasVideo)
+              .toList(growable: false);
+        }
+        final allItems = _cachedItems;
         final categories = ShortVideoMapper.categoriesFor(allItems);
         final filtered = _channel.isEmpty
             ? allItems
             : allItems
-                .where((item) => _matchesChannel(item, _channel))
+                .where(
+                  (item) => ShortVideoChannelMatcher.matches(item, _channel),
+                )
                 .toList();
         final visible = filtered.take(_visibleCount).toList();
+        final entries = NativeListInjection.buildEntries(
+          visible,
+          tabKey: 'shorts.library',
+        );
 
         return Scaffold(
           body: Column(
@@ -101,24 +115,22 @@ class _ShortVideoLibraryScreenState extends State<ShortVideoLibraryScreen> {
                               crossAxisSpacing: 12,
                               childAspectRatio: 0.62,
                             ),
-                            itemCount:
-                                visible.length + (visible.length >= 8 ? 1 : 0),
+                            itemCount: entries.length,
                             itemBuilder: (context, index) {
-                              if (visible.length >= 8 && index == 8) {
-                                return const NativeInlineAdTile(
+                              final entry = entries[index];
+                              if (entry.isAd) {
+                                return NativeInlineAdTile(
+                                  key: ValueKey(
+                                    'shorts.library.native.${entry.itemIndex}',
+                                  ),
                                   tabKey: 'shorts.library',
                                   label: 'Sponsored',
                                   minHeight: 220,
                                 );
                               }
-                              final itemIndex = visible.length >= 8 && index > 8
-                                  ? index - 1
-                                  : index;
-                              if (itemIndex >= visible.length) {
-                                return const SizedBox.shrink();
-                              }
-                              final item = visible[itemIndex];
+                              final item = entry.item!;
                               return _ShortTile(
+                                key: ValueKey('short.${item.safeId}'),
                                 item: item,
                                 onTap: () => ShortVideoNavigation.openReel(
                                   context: context,
@@ -154,8 +166,12 @@ class _ShortVideoLibraryScreenState extends State<ShortVideoLibraryScreen> {
       },
     );
   }
+}
 
-  bool _matchesChannel(ShortVideoItem item, String wanted) {
+class ShortVideoChannelMatcher {
+  const ShortVideoChannelMatcher._();
+
+  static bool matches(ShortVideoItem item, String wanted) {
     final candidates = <String>[
       item.categoryKey,
       item.categoryLabel,
@@ -166,15 +182,12 @@ class _ShortVideoLibraryScreenState extends State<ShortVideoLibraryScreen> {
       item.raw['_section_source_channel']?.toString() ?? '',
       item.raw['source_channel']?.toString() ?? '',
     ];
-    return candidates.any((value) {
-      final clean = _normalize(value);
-      return clean == wanted ||
-          clean.contains(wanted) ||
-          wanted.contains(clean);
-    });
+    final normalizedWanted = normalize(wanted);
+    if (normalizedWanted.isEmpty) return true;
+    return candidates.any((value) => normalize(value) == normalizedWanted);
   }
 
-  static String _normalize(String value) => value
+  static String normalize(String value) => value
       .trim()
       .toLowerCase()
       .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
@@ -208,10 +221,10 @@ class _ChannelFilters extends StatelessWidget {
           for (final category in categories) ...[
             ChoiceChip(
               label: Text(category.label),
-              selected: selected ==
-                  _ShortVideoLibraryScreenState._normalize(category.key),
+              selected:
+                  selected == ShortVideoChannelMatcher.normalize(category.key),
               onSelected: (_) => onSelected(
-                _ShortVideoLibraryScreenState._normalize(category.key),
+                ShortVideoChannelMatcher.normalize(category.key),
               ),
             ),
             const SizedBox(width: 8),
@@ -226,7 +239,7 @@ class _ShortTile extends StatelessWidget {
   final ShortVideoItem item;
   final VoidCallback onTap;
 
-  const _ShortTile({required this.item, required this.onTap});
+  const _ShortTile({super.key, required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -244,6 +257,7 @@ class _ShortTile extends StatelessWidget {
               Image.network(
                 image,
                 fit: BoxFit.cover,
+                cacheWidth: 480,
                 errorBuilder: (_, __, ___) => const _FallbackThumb(),
               )
             else
