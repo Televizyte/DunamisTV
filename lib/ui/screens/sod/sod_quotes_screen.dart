@@ -95,7 +95,7 @@ class SodQuotesScreen extends StatelessWidget {
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
                                   onPressed: () => context.push(
-                                    '/quotes-scripture/library?category=sod_quotes',
+                                    '/quotes-scripture/library?channel=sod_quotes',
                                   ),
                                   icon: const Icon(Icons.library_books_rounded),
                                   label: const Text('Browse Library'),

@@ -652,7 +652,11 @@ class AppRouter {
         path: '/quotes-scripture/library',
         name: 'quotes-scripture-library',
         builder: (context, state) => QuotesScriptureLibraryScreen(
-          initialCategory: state.uri.queryParameters['category'] ?? '',
+          initialCategory: _firstNonEmpty([
+            state.uri.queryParameters['channel'],
+            state.uri.queryParameters['channel_key'],
+            state.uri.queryParameters['category'],
+          ]),
         ),
       ),
       GoRoute(
@@ -667,6 +671,7 @@ class AppRouter {
           return QuoteScriptureReaderScreen(
             items: items,
             initialId: (extra['initialId'] ?? '').toString(),
+            categoryKey: (extra['category'] ?? '').toString(),
           );
         },
       ),

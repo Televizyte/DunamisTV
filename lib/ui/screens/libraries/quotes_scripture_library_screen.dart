@@ -51,10 +51,16 @@ class _QuotesScriptureLibraryScreenState
         }
         final allItems = _cachedItems;
         final categories = QuoteScriptureLibraryMapper.categories(allItems);
-        final filtered = _category.isEmpty
+        final selectedCategory = QuoteLibraryChannelSelection.resolve(
+          _category,
+          categories.keys,
+        );
+        final filtered = selectedCategory.isEmpty
             ? allItems
             : allItems
-                .where((item) => _normalize(item.categoryKey) == _category)
+                .where(
+                  (item) => _normalize(item.categoryKey) == selectedCategory,
+                )
                 .toList();
         final visible = filtered.take(_visibleCount).toList();
         final entries = NativeListInjection.buildEntries(
@@ -85,7 +91,7 @@ class _QuotesScriptureLibraryScreenState
                               children: [
                                 ChoiceChip(
                                   label: const Text('All'),
-                                  selected: _category.isEmpty,
+                                  selected: selectedCategory.isEmpty,
                                   onSelected: (_) => setState(() {
                                     _category = '';
                                     _visibleCount = 30;
@@ -95,7 +101,7 @@ class _QuotesScriptureLibraryScreenState
                                 for (final entry in categories.entries) ...[
                                   ChoiceChip(
                                     label: Text(entry.value),
-                                    selected: _category == entry.key,
+                                    selected: selectedCategory == entry.key,
                                     onSelected: (_) => setState(() {
                                       _category = entry.key;
                                       _visibleCount = 30;
@@ -150,7 +156,7 @@ class _QuotesScriptureLibraryScreenState
                                   extra: {
                                     'items': filtered,
                                     'initialId': item.id,
-                                    'category': _category,
+                                    'category': selectedCategory,
                                   },
                                 ),
                               ),
@@ -189,14 +195,33 @@ class _QuotesScriptureLibraryScreenState
       .replaceAll(RegExp(r'^_|_$'), '');
 }
 
+class QuoteLibraryChannelSelection {
+  const QuoteLibraryChannelSelection._();
+
+  static String resolve(String requested, Iterable<String> available) {
+    final normalized = QuoteScriptureLibraryMapper.normalizeChannelKey(
+      requested,
+    );
+    if (normalized.isEmpty) return '';
+    for (final key in available) {
+      if (QuoteScriptureLibraryMapper.normalizeChannelKey(key) == normalized) {
+        return normalized;
+      }
+    }
+    return '';
+  }
+}
+
 class QuoteScriptureReaderScreen extends StatefulWidget {
   final List<QuoteScriptureLibraryItem> items;
   final String initialId;
+  final String categoryKey;
 
   const QuoteScriptureReaderScreen({
     super.key,
     required this.items,
     this.initialId = '',
+    this.categoryKey = '',
   });
 
   @override
@@ -325,7 +350,16 @@ class _QuoteScriptureReaderScreenState
                   right: 12,
                   child: IconButton.filledTonal(
                     tooltip: 'Browse library',
-                    onPressed: () => context.push('/quotes-scripture/library'),
+                    onPressed: () {
+                      final channel =
+                          QuoteScriptureLibraryMapper.normalizeChannelKey(
+                              widget.categoryKey);
+                      context.push(
+                        channel.isEmpty
+                            ? '/quotes-scripture/library'
+                            : '/quotes-scripture/library?channel=${Uri.encodeQueryComponent(channel)}',
+                      );
+                    },
                     icon: const Icon(Icons.library_books_rounded),
                   ),
                 ),
@@ -560,17 +594,7 @@ class QuoteScriptureLibraryMapper {
       final joined = '${map['bucket']} ${map['type']} ${map['key']} '
               '${map['title']} $path'
           .toLowerCase();
-      final text = _first(map, const [
-        'quote_text',
-        'scripture_text',
-        'verse_text',
-        'quote',
-        'text',
-        'content',
-        'body',
-        'message',
-        'excerpt',
-      ]);
+      final text = _publicContent(map);
       final looksRelevant = joined.contains('quote') ||
           joined.contains('scripture') ||
           joined.contains('verse') ||
@@ -622,6 +646,11 @@ class QuoteScriptureLibraryMapper {
         }
       }
       for (final entry in map.entries) {
+        if (_nonContentBranchKeys.contains(
+          normalizeChannelKey(entry.key),
+        )) {
+          continue;
+        }
         if (entry.value is Map || entry.value is List) {
           scan(
             entry.value,
@@ -739,12 +768,88 @@ class QuoteScriptureLibraryMapper {
     ]);
     if (channelKey.isEmpty) return false;
 
-    return _first(map, const [
+    return _publicContent(map, keys: const [
       'quote_text',
       'scripture_text',
       'verse_text',
       'quote',
     ]).isNotEmpty;
+  }
+
+  static const _publicContentKeys = <String>[
+    'quote_text',
+    'scripture_text',
+    'verse_text',
+    'quote',
+    'text',
+    'message',
+    'excerpt',
+    'body',
+    'content',
+  ];
+
+  static const _nonContentBranchKeys = <String>{
+    'design',
+    'design_json',
+    'style',
+    'styles',
+    'settings',
+    'metadata',
+    'meta',
+    'queue',
+    'queue_data',
+    'publication',
+    'processing',
+    'status',
+    'layout',
+    'payload_control',
+  };
+
+  static const _statusValues = <String>{
+    'queued',
+    'pending',
+    'processing',
+    'failed',
+    'published',
+  };
+
+  static String _publicContent(
+    Map<String, dynamic> map, {
+    List<String> keys = _publicContentKeys,
+  }) {
+    for (final key in keys) {
+      final value = map[key];
+      if (value is! String) continue;
+      final text = value.trim();
+      if (text.isEmpty || text.toLowerCase() == 'null') continue;
+      if (_statusValues.contains(text.toLowerCase())) continue;
+      if (_isOperationalMessage(text)) continue;
+      if (_isJsonContainerString(text)) continue;
+      return text;
+    }
+    return '';
+  }
+
+  static bool _isJsonContainerString(String value) {
+    final first = value.trimLeft();
+    if (!first.startsWith('{') && !first.startsWith('[')) return false;
+    try {
+      final decoded = jsonDecode(value);
+      return decoded is Map || decoded is List;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static bool _isOperationalMessage(String value) {
+    final normalized = value.trimLeft().toLowerCase();
+    return normalized.startsWith('error:') ||
+        normalized.startsWith('exception:') ||
+        normalized.startsWith('stack trace:') ||
+        normalized.startsWith('sqlstate') ||
+        normalized.startsWith('typeerror:') ||
+        normalized.startsWith('formatexception:') ||
+        normalized.startsWith('internal server error');
   }
 
   static String normalizeChannelKey(String value) => value

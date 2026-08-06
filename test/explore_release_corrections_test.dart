@@ -36,6 +36,16 @@ void main() {
       );
     });
 
+    test('existing Books Library route remains unchanged', () {
+      expect(
+        ExploreReleaseContract.resolveRoute(
+          '/tools/books',
+          title: 'Books Reader/Library',
+        ),
+        '/tools/books',
+      );
+    });
+
     test('placement zones retain approved broad order', () {
       const zones = <String>[
         'featured',
