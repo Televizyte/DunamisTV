@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app_config.dart';
 import '../../../services/ads_service.dart';
+import '../../../ui/shared/designers/public_attribution_normalizer.dart';
 import '../data/hub_service.dart';
 
 class HubStore extends ChangeNotifier {
@@ -2478,7 +2479,7 @@ class HubStore extends ChangeNotifier {
     }
 
     final text = _pickFirstString(item, textKeys);
-    final source = _pickFirstString(item, sourceKeys);
+    final source = _pickFirstAttribution(item, sourceKeys);
     final note = _pickFirstString(item, noteKeys);
     final imageUrl = _normalizeRemoteAssetUrl(_pickImage(item) ?? '');
 
@@ -2643,6 +2644,26 @@ class HubStore extends ChangeNotifier {
         final value = meta[key];
         final text = value?.toString().trim() ?? '';
         if (text.isNotEmpty) return text;
+      }
+    }
+
+    return '';
+  }
+
+  String _pickFirstAttribution(
+    Map<String, dynamic> item,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final normalized = PublicAttributionNormalizer.normalize(item[key]);
+      if (normalized != null) return normalized;
+    }
+
+    final meta = _asMap(item['meta']);
+    if (meta != null) {
+      for (final key in keys) {
+        final normalized = PublicAttributionNormalizer.normalize(meta[key]);
+        if (normalized != null) return normalized;
       }
     }
 

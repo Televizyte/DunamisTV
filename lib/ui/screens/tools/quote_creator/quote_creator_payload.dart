@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../features/quote_creator/state/quote_creator_store.dart';
+import '../../../shared/designers/public_attribution_normalizer.dart';
 
 class QuoteCreatorIncomingPayloadResult {
   final String sourceType;
@@ -32,7 +33,14 @@ QuoteCreatorIncomingPayloadResult? applyQuoteCreatorIncomingPayload({
 
   if (designDataRaw is Map) {
     final designData = Map<String, dynamic>.from(designDataRaw);
-    store.loadFromPayload(designData);
+    final normalizedDesignData = <String, dynamic>{
+      ...designData,
+      'author':
+          PublicAttributionNormalizer.normalize(designData['author']) ?? '',
+      'reference':
+          PublicAttributionNormalizer.normalize(designData['reference']) ?? '',
+    };
+    store.loadFromPayload(normalizedDesignData);
     quoteController.text = store.quote;
     authorController.text = store.author;
 
@@ -41,8 +49,11 @@ QuoteCreatorIncomingPayloadResult? applyQuoteCreatorIncomingPayload({
         .trim();
     final sourceId =
         (designData['source_id'] ?? data['source_id'] ?? '').toString().trim();
-    final reference =
-        (designData['reference'] ?? data['reference'] ?? '').toString().trim();
+    final reference = PublicAttributionNormalizer.normalize(
+          designData['reference'],
+        ) ??
+        PublicAttributionNormalizer.normalize(data['reference']) ??
+        '';
 
     return QuoteCreatorIncomingPayloadResult(
       sourceType: sourceType,
@@ -54,23 +65,21 @@ QuoteCreatorIncomingPayloadResult? applyQuoteCreatorIncomingPayload({
   }
 
   final prefill = (data['prefill'] ?? '').toString().trim();
-  final author = (data['author'] ?? '').toString().trim();
-  final reference = (data['reference'] ?? '').toString().trim();
+  final author = PublicAttributionNormalizer.normalize(data['author']) ?? '';
+  final reference =
+      PublicAttributionNormalizer.normalize(data['reference']) ?? '';
   final sourceType =
       (data['source_type'] ?? data['source'] ?? '').toString().trim();
   final sourceId = (data['source_id'] ?? '').toString().trim();
-
-  final resolvedAuthor =
-      author.isNotEmpty ? author : (reference.isNotEmpty ? reference : '');
 
   if (prefill.isNotEmpty) {
     quoteController.text = prefill;
     store.setQuote(prefill);
   }
 
-  if (resolvedAuthor.isNotEmpty) {
-    authorController.text = resolvedAuthor;
-    store.setAuthor(resolvedAuthor);
+  if (author.isNotEmpty) {
+    authorController.text = author;
+    store.setAuthor(author);
   }
 
   _applyDesignFields(store, data);

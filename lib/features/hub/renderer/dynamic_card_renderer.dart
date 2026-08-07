@@ -9,6 +9,7 @@ import '../models/dynamic_section.dart';
 import '../navigation/dynamic_action_executor.dart';
 import '../../../ui/shared/designers/dxm_design_parser.dart';
 import '../../../ui/shared/designers/dxm_dynamic_quote_card.dart';
+import '../../../ui/shared/designers/public_attribution_normalizer.dart';
 import '../../../features/notes/models/note_model.dart';
 import '../../../features/notes/state/notes_store.dart';
 
@@ -1306,9 +1307,11 @@ class _DailyContent {
               raw['subtitle'] ??
               card.subtitle,
         ),
-        reference: _stringValue(
-          raw['scripture_reference'] ?? raw['reference'] ?? raw['ref'],
-        ),
+        reference: _publicAttributionFrom([
+          raw['scripture_reference'],
+          raw['reference'],
+          raw['ref'],
+        ]),
       );
     }
 
@@ -1321,13 +1324,13 @@ class _DailyContent {
           card.title,
     );
 
-    final source = _stringValue(
-      raw['quote_source'] ??
-          raw['source'] ??
-          raw['author_name'] ??
-          raw['subtitle'] ??
-          card.subtitle,
-    );
+    final source = _publicAttributionFrom([
+      raw['quote_source'],
+      raw['source'],
+      raw['author_name'],
+      raw['subtitle'],
+      card.subtitle,
+    ]);
 
     return _DailyContent(
       kind: kind == 'daily_quote' ? kind : 'daily_quote',
@@ -1607,6 +1610,14 @@ String _stringValue(dynamic value, {String fallback = ''}) {
   final text = value.toString().trim();
   if (text.startsWith('{') || text.startsWith('(')) return fallback;
   return text.isEmpty ? fallback : text;
+}
+
+String _publicAttributionFrom(Iterable<Object?> values) {
+  for (final value in values) {
+    final normalized = PublicAttributionNormalizer.normalize(value);
+    if (normalized != null) return normalized;
+  }
+  return '';
 }
 
 int _intValue(

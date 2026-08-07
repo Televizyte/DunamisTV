@@ -12,6 +12,7 @@ import '../../../theme/theme_controller.dart';
 import '../../../services/ads_service.dart';
 import '../../shared/designers/dxm_design_parser.dart';
 import '../../shared/designers/dxm_dynamic_quote_card.dart';
+import '../../shared/designers/public_attribution_normalizer.dart';
 import '../../widgets/ads/native_inline_ad_tile.dart';
 import '../../widgets/ads/native_list_injection.dart';
 import '../../widgets/banner_ad_widget.dart';
@@ -356,6 +357,51 @@ class SodQuotesScreen extends StatelessWidget {
     return '';
   }
 
+  static String _firstPublicAttribution(
+    Map<String, dynamic> map,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final normalized = PublicAttributionNormalizer.normalize(map[key]);
+      if (normalized != null) return normalized;
+    }
+
+    for (final nestedKey in const [
+      'payload',
+      'quote_card',
+      'design',
+      'render_style',
+      'style',
+      'meta',
+      'cover',
+      'media',
+    ]) {
+      final nested = _asMap(map[nestedKey]);
+      if (nested == null) continue;
+      for (final key in keys) {
+        final normalized = PublicAttributionNormalizer.normalize(nested[key]);
+        if (normalized != null) return normalized;
+      }
+
+      for (final childKey in const [
+        'quote_card',
+        'design',
+        'layout',
+        'typography',
+        'colors',
+      ]) {
+        final child = _asMap(nested[childKey]);
+        if (child == null) continue;
+        for (final key in keys) {
+          final normalized = PublicAttributionNormalizer.normalize(child[key]);
+          if (normalized != null) return normalized;
+        }
+      }
+    }
+
+    return '';
+  }
+
   static DateTime? _parseDate(String raw) {
     if (raw.trim().isEmpty) return null;
     try {
@@ -604,7 +650,7 @@ class _SodQuotePayload {
       'content',
       'message',
     ]).trim();
-    final source = SodQuotesScreen._firstString(item, const [
+    final source = SodQuotesScreen._firstPublicAttribution(item, const [
       'quote_source',
       'source',
       'author',

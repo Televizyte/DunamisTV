@@ -25,6 +25,39 @@ void main() {
       expect(items, isEmpty);
     });
 
+    test('invalid attribution is omitted and valid alias precedence continues',
+        () {
+      final items = QuoteScriptureLibraryMapper.fromRawHub({
+        'quote_channel': {
+          'channel_key': 'daily_quote',
+          'items': [
+            {
+              'id': 'map-source',
+              'quote_text': 'A valid quote whose source is an object.',
+              'reference': {'status': 'queued'},
+              'author': 'Dr Paul Enenche',
+            },
+            {
+              'id': 'list-source',
+              'quote_text': 'A valid quote whose source is a list.',
+              'reference': ['technical', 'metadata'],
+            },
+            {
+              'id': 'placeholder-source',
+              'quote_text': 'A valid quote whose source is unavailable.',
+              'author': 'N/A',
+            },
+          ],
+        },
+      });
+
+      expect(items, hasLength(3));
+      expect(items[0].attribution, 'Dr Paul Enenche');
+      expect(items[1].attribution, isEmpty);
+      expect(items[2].attribution, isEmpty);
+      expect(items[0].text, 'A valid quote whose source is an object.');
+    });
+
     test('queue and status maps cannot become quote text', () {
       final items = QuoteScriptureLibraryMapper.fromRawHub({
         'quote_channel': {
@@ -165,6 +198,45 @@ void main() {
         find.text('A valid public quote with meaningful content.'),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'artwork-only attribution keeps design without source space or overflow',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final items = QuoteScriptureLibraryMapper.fromRawHub({
+        'quote_channel': {
+          'channel_key': 'daily_quote',
+          'items': [
+            {
+              'id': 'artwork-only',
+              'quote_text': 'Artwork keeps this public quote unchanged.',
+              'quote_source': {'embedded': 'inside background artwork'},
+              'design': {
+                'background_color': '#112233',
+                'text_color': '#ffffff',
+              },
+            },
+          ],
+        },
+      });
+
+      expect(items, hasLength(1));
+      expect(items.single.attribution, isEmpty);
+      expect(items.single.raw['design'], isA<Map>());
+
+      await tester.pumpWidget(_presentation(items.single));
+
+      final card = tester.widget<DxmDynamicQuoteCard>(
+        find.byType(DxmDynamicQuoteCard),
+      );
+      expect(card.mainText, 'Artwork keeps this public quote unchanged.');
+      expect(card.referenceText, isEmpty);
+      expect(find.textContaining('embedded'), findsNothing);
+      expect(tester.takeException(), isNull);
     },
   );
 }

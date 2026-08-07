@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../features/hub/state/hub_scope.dart';
 import '../../shared/designers/dxm_design_parser.dart';
 import '../../shared/designers/dxm_dynamic_quote_card.dart';
+import '../../shared/designers/public_attribution_normalizer.dart';
 import '../../widgets/ads/native_inline_ad_tile.dart';
 import '../../widgets/ads/native_list_injection.dart';
 import '../../widgets/dxm_top_bar.dart';
@@ -625,7 +626,7 @@ class QuoteScriptureLibraryMapper {
             categoryKey: category.key,
             categoryLabel: category.label,
             text: _stripHtml(text),
-            attribution: _first(map, const [
+            attribution: _firstPublicAttribution(map, const [
               'reference',
               'scripture_reference',
               'author',
@@ -884,6 +885,17 @@ class QuoteScriptureLibraryMapper {
       final value = map[key];
       final text = (value ?? '').toString().trim();
       if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+    }
+    return '';
+  }
+
+  static String _firstPublicAttribution(
+    Map<String, dynamic> map,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final normalized = PublicAttributionNormalizer.normalize(map[key]);
+      if (normalized != null) return normalized;
     }
     return '';
   }
