@@ -6,13 +6,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app_config.dart';
+import '../../../core/config/backend_environment.dart';
+import '../../../core/config/backend_response_cache.dart';
 import '../../../services/ads_service.dart';
 import '../../../ui/shared/designers/public_attribution_normalizer.dart';
 import '../data/hub_service.dart';
 
 class HubStore extends ChangeNotifier {
-  static const _cacheKey = 'dxm.hub.bootstrap.cache.v2';
-
   final http.Client _httpClient;
   late final HubService _service;
 
@@ -21,6 +21,7 @@ class HubStore extends ChangeNotifier {
   bool _backgroundRefreshing = false;
   String? _error;
   DateTime? _lastUpdated;
+  DateTime? _lastSuccessfulRefresh;
 
   HubStore() : _httpClient = http.Client() {
     _service = HubService(
@@ -39,8 +40,38 @@ class HubStore extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
   DateTime? get lastUpdated => _lastUpdated;
+  DateTime? get lastSuccessfulRefresh => _lastSuccessfulRefresh;
 
   Map<String, dynamic> get raw => _data;
+
+  String get backendCacheKey => BackendCacheIdentity.key(
+        appSlug: AppConfig.appSlug,
+        endpoint: BackendEnvironment.active,
+      );
+
+  Future<bool> hasCachedBackendData() async {
+    final preferences = await SharedPreferences.getInstance();
+    return BackendResponseCache(
+      preferences: preferences,
+      appSlug: AppConfig.appSlug,
+      endpoint: BackendEnvironment.active,
+    ).exists;
+  }
+
+  Future<void> clearCurrentBackendCache() async {
+    if (!kDebugMode) return;
+    final preferences = await SharedPreferences.getInstance();
+    await BackendResponseCache(
+      preferences: preferences,
+      appSlug: AppConfig.appSlug,
+      endpoint: BackendEnvironment.active,
+    ).clear();
+  }
+
+  Future<void> debugReloadBootstrap() async {
+    if (!kDebugMode) return;
+    await _refreshSecondaryPayloads();
+  }
 
   Map<String, dynamic> get capabilities =>
       _asMap(_data['capabilities']) ??
@@ -382,6 +413,7 @@ class HubStore extends ChangeNotifier {
       if (normalized.isNotEmpty) {
         _data = normalized;
         _lastUpdated = DateTime.now();
+        _lastSuccessfulRefresh = _lastUpdated;
 
         if (latestBootstrap.isNotEmpty) {
           AdsService.instance.applyBootstrap(latestBootstrap);
@@ -502,6 +534,7 @@ class HubStore extends ChangeNotifier {
         applyRefreshedAdPolicy(bootstrap);
         _data = normalized;
         _lastUpdated = DateTime.now();
+        _lastSuccessfulRefresh = _lastUpdated;
         await _saveCache(normalized);
         notifyListeners();
       }
@@ -2806,7 +2839,11 @@ class HubStore extends ChangeNotifier {
   Future<void> _loadCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final s = prefs.getString(_cacheKey);
+      final s = await BackendResponseCache(
+        preferences: prefs,
+        appSlug: AppConfig.appSlug,
+        endpoint: BackendEnvironment.active,
+      ).load();
       if (s == null || s.trim().isEmpty) return;
 
       final decoded = jsonDecode(s);
@@ -2821,7 +2858,11 @@ class HubStore extends ChangeNotifier {
   Future<void> _saveCache(Map<String, dynamic> json) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cacheKey, jsonEncode(json));
+      await BackendResponseCache(
+        preferences: prefs,
+        appSlug: AppConfig.appSlug,
+        endpoint: BackendEnvironment.active,
+      ).save(jsonEncode(json));
     } catch (_) {}
   }
 

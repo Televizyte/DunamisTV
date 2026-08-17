@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'ad_consent_service.dart';
+
 class AdsService {
   AdsService._();
   static final AdsService instance = AdsService._();
@@ -68,9 +70,13 @@ class AdsService {
     if (_initialized) return;
 
     if (!kIsWeb) {
+      final consentGranted = await AdConsentService.instance.gatherConsent();
+      if (!consentGranted) return;
       try {
         await MobileAds.instance.initialize();
-      } catch (_) {}
+      } catch (_) {
+        return;
+      }
     }
 
     _sessionStartedAt = DateTime.now();
@@ -83,6 +89,8 @@ class AdsService {
     required String placement,
   }) async {
     if (kIsWeb || !_adsEnabled() || !_formatEnabled(format)) return false;
+    if (!_initialized) await init();
+    if (!_initialized || !AdConsentService.instance.canRequestAds) return false;
 
     final readyAt = _adNetworkReadyAt;
     if (readyAt != null) {
@@ -318,10 +326,31 @@ class AdsService {
   }
 
   String bannerPlacementForPolicy(String policyKey) {
-    return (bannerConfigForPolicy(policyKey)['placement'] ?? 'disabled')
-        .toString()
-        .trim()
-        .toLowerCase();
+    final config = bannerConfigForPolicy(policyKey);
+    final configured =
+        (config['placement'] ?? '').toString().trim().toLowerCase();
+
+    // Explicit backend placement always wins, including "disabled".
+    if (configured.isNotEmpty) {
+      return configured;
+    }
+
+    // Compatibility for root-tab policies created before placement metadata.
+    // The backend must still explicitly allow banner format for the tab.
+    final key = _canonicalPolicyKey(policyKey);
+    const rootTabs = <String>{
+      'home',
+      'watch',
+      'inspire',
+      'explore',
+      'more',
+    };
+
+    if (rootTabs.contains(key) && _tabAllowed(key, 'banner')) {
+      return 'shell_bottom';
+    }
+
+    return 'disabled';
   }
 
   bool bannerHideOnFailureForPolicy(String policyKey) {
@@ -343,6 +372,14 @@ class AdsService {
     if (!hasUnitForFormat('banner')) return false;
     return bannerPlacementForPolicy(policyKey) ==
         placement.trim().toLowerCase();
+  }
+
+  bool rootBannerAllowedForPolicy(
+    String policyKey, {
+    bool debug = kDebugMode,
+  }) {
+    return bannerAllowedForPlacement(policyKey, 'shell_bottom') &&
+        hasUnitForFormat('banner', debug: debug);
   }
 
   String resolveRoutePolicyKey(String location, {required String fallback}) {

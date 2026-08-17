@@ -161,10 +161,27 @@ class _BottomShellState extends State<BottomShell> {
     final tabKey = _tabKeyFromIndex(tabs, currentIndex);
     final policyKey = _policyKeyForLocation(loc, tabKey);
 
-    final bannerAllowed = AdsService.instance.bannerAllowedForPlacement(
-      policyKey,
-      'shell_bottom',
-    );
+    final bannerPlacement =
+        AdsService.instance.bannerPlacementForPolicy(policyKey);
+    final bannerPolicyAllowed =
+        AdsService.instance.bannerAllowedForTab(policyKey);
+    final bannerHasUnit = AdsService.instance.hasUnitForFormat('banner');
+    final bannerAllowed =
+        AdsService.instance.rootBannerAllowedForPolicy(policyKey);
+
+    assert(() {
+      debugPrint(
+        '[RootBannerDecision] '
+        'location=$loc '
+        'tab=$tabKey '
+        'policy=$policyKey '
+        'policyAllowed=$bannerPolicyAllowed '
+        'hasUnit=$bannerHasUnit '
+        'placement=$bannerPlacement '
+        'render=$bannerAllowed',
+      );
+      return true;
+    }());
 
     const navH = kBottomNavigationBarHeight;
     final bannerH = bannerAllowed &&

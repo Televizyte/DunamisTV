@@ -21,7 +21,7 @@ class ImageBlock extends StatelessWidget {
     if (u.startsWith('http')) return u;
 
     // FIX: convert relative path to full AppsHub URL
-    return 'https://admin.apps.digitxtramedia.com$u';
+    return 'https://admin.appshub.digitxtramedia.com$u';
   }
 
   @override

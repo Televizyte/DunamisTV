@@ -36,7 +36,7 @@ class ArticleBlockRenderer extends StatelessWidget {
     if (u.startsWith('http://') || u.startsWith('https://')) return u;
     if (u.startsWith('//')) return 'https:$u';
     if (u.startsWith('/')) {
-      return 'https://admin.apps.digitxtramedia.com$u';
+      return 'https://admin.appshub.digitxtramedia.com$u';
     }
 
     return u;
@@ -230,7 +230,8 @@ class ArticleBlockRenderer extends StatelessWidget {
                             child: const SizedBox(
                               width: 26,
                               height: 26,
-                              child: CircularProgressIndicator(strokeWidth: 2.2),
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2.2),
                             ),
                           );
                         },

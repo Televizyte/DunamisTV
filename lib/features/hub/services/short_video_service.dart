@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ShortVideoService {
   static const String baseUrl =
-      'https://admin.apps.digitxtramedia.com/api/v1';
+      'https://admin.appshub.digitxtramedia.com/api/v1';
 
   static const String appToken = 'YOUR_APP_TOKEN_HERE';
 

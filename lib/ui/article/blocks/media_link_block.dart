@@ -27,15 +27,16 @@ class MediaLinkBlock extends StatelessWidget {
       ],
     );
     final url = _normalizeUrl(rawUrl);
-    final resolvedType = _resolveMediaType(url: url, explicitType: explicitType);
-    final title =
-        _firstNonEmpty(block, const ['title', 'name']).trim().isEmpty
-            ? _defaultTitle(resolvedType)
-            : _firstNonEmpty(block, const ['title', 'name']).trim();
-    final subtitle =
-        _firstNonEmpty(block, const ['subtitle', 'description', 'caption']).trim().isEmpty
-            ? _defaultSubtitle(resolvedType)
-            : _firstNonEmpty(block, const ['subtitle', 'description', 'caption']).trim();
+    final resolvedType =
+        _resolveMediaType(url: url, explicitType: explicitType);
+    final title = _firstNonEmpty(block, const ['title', 'name']).trim().isEmpty
+        ? _defaultTitle(resolvedType)
+        : _firstNonEmpty(block, const ['title', 'name']).trim();
+    final subtitle = _firstNonEmpty(
+            block, const ['subtitle', 'description', 'caption']).trim().isEmpty
+        ? _defaultSubtitle(resolvedType)
+        : _firstNonEmpty(block, const ['subtitle', 'description', 'caption'])
+            .trim();
     final imageUrl = _normalizeUrl(
       _firstNonEmpty(
         block,
@@ -217,7 +218,7 @@ class MediaLinkBlock extends StatelessWidget {
     }
 
     if (value.startsWith('/')) {
-      return 'https://admin.apps.digitxtramedia.com$value';
+      return 'https://admin.appshub.digitxtramedia.com$value';
     }
 
     return value;

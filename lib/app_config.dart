@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'brands/brand_config.dart';
 import 'brands/dunamis_brand.dart';
+import 'core/config/backend_environment.dart';
 
 class AppConfig {
   AppConfig._();
@@ -29,7 +30,8 @@ class AppConfig {
   static bool get isDunamis => appSlug == 'dunamis-tv';
   static bool get isCelebration => appSlug == 'celebration-tv';
 
-  static String get apiBaseUrl => _brand.apiBaseUrl;
+  static String get apiBaseUrl =>
+      isDunamis ? BackendEnvironment.active.apiBaseUrl : _brand.apiBaseUrl;
 
   static String get hubBootstrapUrl =>
       '$apiBaseUrl/api/v1/apps/$appSlug/bootstrap';

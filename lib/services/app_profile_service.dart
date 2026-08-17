@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_config.dart';
+import '../core/config/backend_environment.dart';
+import '../core/config/backend_response_cache.dart';
 
 class AppPublicLink {
   final String key;
@@ -281,7 +283,18 @@ class AppProfileService {
 
   static final AppProfileService instance = AppProfileService._();
 
-  static const String _cacheKey = 'dxm_app_public_profile_cache_v2';
+  static const String _legacyCacheKey = 'dxm_app_public_profile_cache_v2';
+
+  Future<BackendResponseCache> _cache() async {
+    final preferences = await SharedPreferences.getInstance();
+    return BackendResponseCache(
+      preferences: preferences,
+      appSlug: AppConfig.appSlug,
+      endpoint: BackendEnvironment.active,
+      namespace: 'app.public.profile',
+      legacyProductionKey: _legacyCacheKey,
+    );
+  }
 
   Future<AppPublicProfile> getProfile({bool refresh = false}) async {
     if (!refresh) {
@@ -314,8 +327,7 @@ class AppProfileService {
 
   Future<AppPublicProfile?> _readCachedProfile() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_cacheKey);
+      final raw = await (await _cache()).load();
       if (raw == null || raw.trim().isEmpty) return null;
 
       final decoded = jsonDecode(raw);
@@ -329,8 +341,7 @@ class AppProfileService {
 
   Future<void> _cacheProfile(String rawJson) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cacheKey, rawJson);
+      await (await _cache()).save(rawJson);
     } catch (_) {}
   }
 

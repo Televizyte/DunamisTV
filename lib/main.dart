@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
+import 'app_config.dart';
 import 'brands/brand_selector.dart';
+import 'core/config/backend_environment.dart';
 import 'features/hub/state/hub_scope.dart';
 import 'features/hub/state/hub_store.dart';
 import 'routing/app_router.dart';
@@ -11,11 +13,13 @@ import 'services/notification_bootstrap_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 import 'ui/screens/notifications/notification_message_card.dart';
+import 'ui/debug/backend_diagnostics_overlay.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   BrandSelector.applyFromEnvironment();
+  BackendEnvironment.logSanitizedStartup(AppConfig.appSlug);
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   runApp(const _DxmStartupGate());
@@ -192,8 +196,11 @@ class DxmHubApp extends StatelessWidget {
             themeMode: ThemeController.instance.themeMode,
             routerConfig: AppRouter.router,
             builder: (context, child) {
-              return DxmNotificationOverlayHost(
-                child: child ?? const SizedBox.shrink(),
+              return BackendDiagnosticsOverlay(
+                store: store,
+                child: DxmNotificationOverlayHost(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               );
             },
           );

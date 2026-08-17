@@ -116,6 +116,28 @@ void main() {
       ads.bannerAllowedForPlacement('explore.notes', 'page_bottom'),
       isTrue,
     );
+    expect(
+      ads.rootBannerAllowedForPolicy('explore.notes', debug: false),
+      isFalse,
+    );
+  });
+
+  test('root banner requires shell placement, enabled policy and unit', () {
+    ads.applyBootstrap(_bootstrap());
+    expect(ads.rootBannerAllowedForPolicy('home', debug: false), isTrue);
+
+    ads.applyBootstrap(_bootstrap(homeBanner: false));
+    expect(ads.rootBannerAllowedForPolicy('home', debug: false), isFalse);
+
+    ads.applyBootstrap(_bootstrap(masterEnabled: false));
+    expect(ads.rootBannerAllowedForPolicy('home', debug: false), isFalse);
+
+    ads.applyBootstrap(_bootstrap(units: const <String, dynamic>{
+      'banner': '',
+      'native': 'configured-native',
+      'interstitial': 'configured-interstitial',
+    }));
+    expect(ads.rootBannerAllowedForPolicy('home', debug: false), isFalse);
   });
 
   test('native zero cap is unlimited and positive cap is enforced', () {

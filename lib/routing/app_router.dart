@@ -99,7 +99,11 @@ String _firstNonEmpty(List<dynamic> values) {
 }
 
 class AppRouter {
+  static final GlobalKey<NavigatorState> rootNavigatorKey =
+      GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: true,
     errorBuilder: (context, state) {
