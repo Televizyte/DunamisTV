@@ -27,8 +27,8 @@ android {
         applicationId = "com.digitxtramedia.dunamistv"
         minSdk = 24
         targetSdk = 36
-        versionCode = 14
-        versionName = "3.47.0"
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
         multiDexEnabled = true
     }
 
