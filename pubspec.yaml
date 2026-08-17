@@ -1,7 +1,7 @@
 name: dunamis_tv
 description: Dunamis TV (Play Store update scaffold, AdMob-compliant)
 publish_to: "none"
-version: 3.47.0+14
+version: 3.47.1+15
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
